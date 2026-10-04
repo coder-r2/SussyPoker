@@ -72,7 +72,8 @@ def validate(sub: pd.DataFrame, eval_pairs: pd.DataFrame,
     if repeats.any():
         error(f"{repeats.sum()} rows repeat an evidence hand")
 
-    if hands is not None and seats is not None and not issues:
+    # Warnings (e.g. tied scores) must not skip the hand check; only errors make it meaningless.
+    if hands is not None and seats is not None and not any(i.level == "error" for i in issues):
         issues += _check_evidence_hands(sub, eval_pairs, hands, seats)
     return issues
 

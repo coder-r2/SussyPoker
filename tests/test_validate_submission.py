@@ -73,6 +73,12 @@ def test_tied_scores_warn():
     assert [i.level for i in issues] == ["warning"]
 
 
+def test_tie_warning_does_not_skip_hand_check():
+    sub = good_submission().assign(risk_score=0.5)
+    sub.loc[2, "evidence_hand_1"] = "H9"
+    assert any("development period" in e for e in errors(sub, hands=HANDS, seats=SEATS))
+
+
 @pytest.mark.data
 @pytest.mark.skipif(not has_raw_data(), reason="competition data not available")
 def test_sample_submission_only_misses_families():
