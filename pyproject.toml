@@ -20,6 +20,7 @@ dependencies = [
     "scikit-learn==1.9.1",
     "lightgbm==4.7.0",
     "shap==0.52.0",
+    "phevaluator==0.6.0",
 ]
 
 [project.optional-dependencies]
@@ -37,10 +38,14 @@ dev = [
     "nbformat==5.11.1",
     "nbconvert==7.17.1",
     "kaggle==2.2.4",
+    "treys==0.1.8",
 ]
 
 [tool.setuptools.packages.find]
 include = ["suspoker*"]
+
+[tool.setuptools.package-data]
+suspoker = ["resources/*.json"]
 
 [tool.ruff]
 line-length = 120

@@ -29,3 +29,6 @@ access_token
 Thumbs.db
 .vscode/
 .idea/
+
+# Claude Code local worktrees
+.claude/
