@@ -70,14 +70,16 @@ def load_dev(pair_features: pl.DataFrame, windows: pl.DataFrame | None = None, n
     seed = cfg["seed"] if seed is None else seed
     labels = pl.read_csv(RAW_DIR / "development_labels.csv")
     evidence = pl.read_csv(RAW_DIR / "development_evidence.csv")
-    dev = with_exposure(pair_features.filter(pl.col("phase") == 0))
-    lab = keyed(labels).select("pair_id", *KEYS, "label", "behavior_family").join(dev, on=KEYS, how="inner")
+    # sort: polars group_by output order varies between pipeline runs, and sampling must not depend on it
+    dev = with_exposure(pair_features.filter(pl.col("phase") == 0)).sort(KEYS)
+    lab = (keyed(labels).select("pair_id", *KEYS, "label", "behavior_family").join(dev, on=KEYS, how="inner")
+           .sort("pair_id"))
     assert lab.height == labels.height, "every labeled pair must have development features"
 
     folds = make_folds(lab, n_folds, seed)
     table_fold = (folds.join(lab.select("pair_id", "table_id"), on="pair_id")
                   .unique("table_id").select("table_id", "fold"))
-    lab = lab.join(folds, on="pair_id").with_columns(pl.lit(True).alias("labeled"))
+    lab = lab.join(folds, on="pair_id").sort("pair_id").with_columns(pl.lit(True).alias("labeled"))
 
     pos = lab.filter(pl.col("label") == 1)
     pos_players = pl.concat([pos["player_lo"], pos["player_hi"]]).unique()
@@ -88,7 +90,8 @@ def load_dev(pair_features: pl.DataFrame, windows: pl.DataFrame | None = None, n
            .join(table_fold, on="table_id", how="left")
            .with_columns(pl.col("fold").fill_null(pl.col("table_id").hash(seed) % n_folds).cast(pl.Int8),
                          pl.lit(0, pl.Int64).alias("label"), pl.lit("none").alias("behavior_family"),
-                         pl.lit(False).alias("labeled")))
+                         pl.lit(False).alias("labeled"))
+           .sort(KEYS))
     unl = unl.with_columns(pl.Series("pair_id", synthetic_pair_ids(unl, seed)))
     mirror = pl.concat([lab, unl.select(lab.columns)])
     assert mirror["pair_id"].n_unique() == mirror.height, "synthetic pair_id collision"

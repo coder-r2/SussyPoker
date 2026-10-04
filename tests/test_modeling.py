@@ -83,3 +83,19 @@ def test_mirror_set_follows_the_evaluation_filter():
     assert unl["n_shared"].min() >= 57
     assert not (set(unl["player_lo"]) | set(unl["player_hi"])) & players
     assert d.mirror["pair_id"].n_unique() == d.mirror.height
+
+
+@pytest.mark.data
+@pytest.mark.skipif(not has_raw_data(), reason="competition data not available")
+def test_load_dev_does_not_depend_on_input_row_order():
+    # polars group_by output order changes between pipeline runs; training samples must not change with it
+    from suspoker.modeling import load_dev
+    from suspoker.pipeline import FEATURES_DIR
+
+    path = FEATURES_DIR / "pair_features.parquet"
+    if not path.exists():
+        pytest.skip("run the feature pipeline first")
+    pf = pl.read_parquet(path).filter(pl.col("phase") == 0)
+    a, b = load_dev(pf), load_dev(pf.sample(fraction=1.0, shuffle=True, seed=1))
+    assert a.mirror.equals(b.mirror)
+    assert a.mirror.sample(500, seed=3).equals(b.mirror.sample(500, seed=3))
