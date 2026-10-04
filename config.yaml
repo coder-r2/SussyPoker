@@ -21,10 +21,11 @@ competition:
 cv:
   n_folds: 5
   group: table_id
+  stratify: behavior_family   # leaderboard split is stratified by family -> StratifiedGroupKFold
 
 features:
   shrinkage_k: 20               # Beta prior strength for lift features
-  window_hands: 25              # rolling window (shared hands) for episodic features
+  block_hands: 500              # time block (table hands) for episodic features (F6)
 
 behavior_policy:
   other_coordination:
