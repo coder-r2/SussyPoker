@@ -9,7 +9,7 @@ description = "Detecting coordinated play (collusion) between poker players, wit
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
-authors = [{ name = "Rishe" }]
+authors = [{ name = "Rishe Raghavendira Gnanasekaran" }]
 dependencies = [
     "numpy==2.5.3",
     "pandas==3.0.6",
