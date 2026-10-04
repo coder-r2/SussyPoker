@@ -1,4 +1,4 @@
-"""S5: pair-level features (families F1-F7) and hand-level features for the evidence ranker.
+"""S5: pair-level features (families F1-F8) and hand-level features for the evidence ranker.
 
 **The lift principle.** A relationship feature compares how player X treats partner Y with how X
 treats everyone else:
@@ -88,6 +88,15 @@ for _stem, _fam in _FAMILY_OF_RATE.items():
     for _agg, _which in (("max", "the more extreme player"), ("min", "the less extreme player")):
         CATALOG[f"{_stem}_lift_{_agg}"] = (_fam, f"How much more often {_which} {_RATE_TEXT[_stem]} "
                                                  "facing the partner than facing others")
+# F8 presence: does a player change how they enter pots when the partner is seated at the table?
+WEAK_OPEN_PCT = 0.5   # "weak" opening hand: bottom half of starting hands (combo-weighted percentile)
+WEAK_VPIP_PCT = 0.3
+PRESENCE = {"vpip": "enters pots voluntarily", "pfr": "raises preflop", "open": "opens the pot with a raise",
+            "wopen": "opens with a weak hand", "wvpip": "enters with a weak hand"}
+for _stem, _text in PRESENCE.items():
+    for _agg, _which in (("max", "the more extreme player"), ("min", "the less extreme player")):
+        CATALOG[f"{_stem}_pres_{_agg}"] = ("F8 presence", f"How much more often {_which} {_text} "
+                                                          "when the partner is seated than when not")
 STYLE = ["vpip", "pfr", "af", "wtsd", "fold_rate", "call_rate", "raise_rate", "bet_unopened", "net_bb100",
          "tilt_vpip", "hands"]
 for _s in STYLE:
@@ -127,7 +136,7 @@ def _directional(df: pl.DataFrame, counts: pl.DataFrame, keys_extra: list[str], 
 
 def pair_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.DataFrame, hu: pl.DataFrame,
                   base: pl.DataFrame, k: float, block_min_hands: int = 10) -> pl.DataFrame:
-    """One row per (pair, phase) with features F1-F7."""
+    """One row per (pair, phase) with features F1-F7 (F8 is added by `presence_features`)."""
     sp = sp.join(hvs, on="hand_idx").with_columns(
         (pl.col("n_vpip") - pl.col("vpip_lo").cast(pl.Int32) - pl.col("vpip_hi").cast(pl.Int32)).alias("third_vpip"),
         (pl.col("n_vpip_folded") - (pl.col("vpip_lo") & pl.col("folded_lo")).cast(pl.Int32)
@@ -272,6 +281,36 @@ def pair_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.
     return df.select(keep)
 
 
+def presence_features(hp: pl.DataFrame, sp: pl.DataFrame, k: float) -> pl.DataFrame:
+    """F8: lift of a player's entry habits in hands shared with the partner vs hands without them.
+
+    Unlike F3-F5, which look at responses *to* the partner, this looks at whether the partner's mere
+    presence changes play: coordinated isolation shows up as light open-raises while the partner sits
+    behind ready to step aside.
+    """
+    hp = hp.with_columns((pl.col("open") & (pl.col("pre_pct") < WEAK_OPEN_PCT)).alias("wopen"),
+                         (pl.col("vpip") & (pl.col("pre_pct") < WEAK_VPIP_PCT)).alias("wvpip"))
+    flags = list(PRESENCE)
+    tot = hp.group_by("player_idx", "phase").agg(pl.len().alias("n_t"),
+                                                 *[pl.col(f).sum().alias(f"{f}_t") for f in flags])
+    glob = hp.select(*[pl.col(f).mean() for f in flags]).row(0, named=True)
+    x = hp.select("hand_idx", "player_idx", *flags)
+    df = sp.select("hand_idx", "phase", "player_idx_lo", "player_idx_hi").rename(
+        {"player_idx_lo": "lo", "player_idx_hi": "hi"})
+    for side in ("lo", "hi"):
+        df = df.join(x.rename({"player_idx": side, **{f: f"{f}_{side}" for f in flags}}), on=["hand_idx", side])
+    df = df.group_by(PAIR).agg(pl.len().alias("ns"), *[pl.col(f"{f}_{s}").sum() for f in flags for s in ("lo", "hi")])
+    for side in ("lo", "hi"):
+        names = {"player_idx": side, "n_t": f"n_t_{side}", **{f"{f}_t": f"{f}_t_{side}" for f in flags}}
+        df = df.join(tot.rename(names), on=[side, "phase"])
+    for f in flags:
+        df = df.with_columns(
+            _lift(pl.col(f"{f}_lo"), pl.col("ns"), pl.col(f"{f}_t_lo"), pl.col("n_t_lo"), glob[f], k).alias("a_"),
+            _lift(pl.col(f"{f}_hi"), pl.col("ns"), pl.col(f"{f}_t_hi"), pl.col("n_t_hi"), glob[f], k).alias("b_"))
+        df = _sym(df, "a_", "b_", f"{f}_pres")
+    return df.select(*PAIR, pl.col("^.*_pres_(max|min)$"))
+
+
 def feature_names() -> list[str]:
     return list(CATALOG)
 
@@ -323,6 +362,16 @@ def hand_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.
         pl.col("hu_n").alias("h_hu_n"), pl.col("hu_check").alias("h_hu_check"),
         pl.col("hu_strong_check").alias("h_hu_strong_check"),
         (pl.col("n_vpip") - pl.col("vpip_lo").cast(pl.Int32) - pl.col("vpip_hi").cast(pl.Int32)).alias("h_third_vpip"),
+        ((pl.col("open_lo") & (pl.col("pre_pct_lo") < WEAK_OPEN_PCT))
+         | (pl.col("open_hi") & (pl.col("pre_pct_hi") < WEAK_OPEN_PCT))).alias("h_weak_open"),
+        # isolation step: one partner opens, the other folds preflop behind them
+        ((pl.col("open_hi") & pl.col("sa_ev_1").cast(pl.Boolean))
+         | (pl.col("open_lo") & pl.col("sa_ev_2").cast(pl.Boolean))).alias("h_open_step_aside"),
+        # preflop strength of the partner who opened, and of the partner who stepped aside (null if none)
+        pl.when(pl.col("open_lo")).then(pl.col("pre_pct_lo")).when(pl.col("open_hi")).then(pl.col("pre_pct_hi"))
+        .alias("h_open_pct"),
+        pl.when(pl.col("sa_ev_1").cast(pl.Boolean)).then(pl.col("pre_pct_lo"))
+        .when(pl.col("sa_ev_2").cast(pl.Boolean)).then(pl.col("pre_pct_hi")).alias("h_step_aside_pct"),
     )
     return out.select("lo", "hi", "phase", "hand_idx", "block", pl.col("^h_.*$"))
 
@@ -340,7 +389,7 @@ def build_chunk(t: Tables, k: float, block_hands: int, hand_pairs: pl.DataFrame 
     sp = seat_pairs(hp)
     hvs = hand_vpip_summary(hp)
     base = player_baselines(hp, ea, ev, hu)
-    pf = pair_features(sp, hvs, ev, fl, hu, base, k)
+    pf = pair_features(sp, hvs, ev, fl, hu, base, k).join(presence_features(hp, sp, k), on=PAIR, how="left")
     hf = hand_features(sp, hvs, ev, fl, hu, ctx, hand_pairs) if hand_pairs is not None else None
     return pf, hf, base
 

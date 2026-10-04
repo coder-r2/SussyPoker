@@ -87,6 +87,9 @@ def hand_players(t: Tables, ctx: pl.DataFrame) -> pl.DataFrame:
         .with_columns(
             pl.col("vpip").fill_null(False), pl.col("pfr").fill_null(False), pl.col("saw_flop").fill_null(False),
             pl.col("sa_opp_any").fill_null(False), pl.col("sa_ev_any").fill_null(False),
+            # opened: entered the pot first, with a raise
+            (pl.col("pfr") & (pl.col("other_entry_no").is_null() | (pl.col("other_entry_no") > pl.col("first_vol_no"))))
+            .fill_null(False).alias("open"),
             (pl.col("net") / pl.col("bb")).alias("net_bb"),
             (pl.col("contrib") / pl.col("bb")).alias("contrib_bb"),
         )
@@ -217,7 +220,7 @@ def hu_streets(ea: pl.DataFrame) -> pl.DataFrame:
 
 def seat_pairs(hp: pl.DataFrame) -> pl.DataFrame:
     """All unordered pairs of seated players per hand (15 per six-handed hand)."""
-    cols = ["hand_idx", "player_idx", "seat_no", "vpip", "contrib", "folded", "sd", "net_bb", "pre_pct",
+    cols = ["hand_idx", "player_idx", "seat_no", "vpip", "pfr", "open", "contrib", "folded", "sd", "net_bb", "pre_pct",
             "first_vol_no", "last_pre_no", "fold_pre_no"]
     left = hp.select(*cols, "table_idx", "phase", "block", "bb")
     right = hp.select(cols)

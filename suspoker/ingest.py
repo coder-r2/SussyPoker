@@ -41,10 +41,12 @@ class Tables:
 
     def subset_tables(self, table_idx: list[int]) -> "Tables":
         """Restrict to some tables (hand_idx ranges are contiguous per table)."""
-        hands = self.hands.filter(pl.col("table_idx").is_in(table_idx))
-        keep = hands.select("hand_idx")
+        return self.subset_hands(self.hands.filter(pl.col("table_idx").is_in(table_idx)).select("hand_idx"))
+
+    def subset_hands(self, keep: pl.DataFrame) -> "Tables":
+        """Restrict to the hands listed in `keep` (a frame with a hand_idx column)."""
         return Tables(
-            hands=hands,
+            hands=self.hands.join(keep, on="hand_idx", how="semi"),
             seats=self.seats.join(keep, on="hand_idx", how="semi"),
             actions=self.actions.join(keep, on="hand_idx", how="semi"),
             hand_ids=self.hand_ids.join(keep, on="hand_idx", how="semi"),
