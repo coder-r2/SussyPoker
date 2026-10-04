@@ -1,0 +1,33 @@
+# SusPoker configuration. Paths are relative to the repo root.
+
+paths:
+  raw: data/raw
+  interim: data/interim
+  external: data/external
+  artifacts: artifacts
+  models: models
+
+seed: 42
+
+competition:
+  slug: detect-suspicious-value-transfers-in-poker
+  min_shared_hands: 38          # smallest shared_hands in evaluation_pairs.csv
+  metric_weights:               # official metric (Kaggle notebook florianderoofr/slash-poker-competition-metric)
+    pair_ap: 0.70
+    evidence_map: 0.20
+    behavior_map: 0.10
+  submission_budget_build: 5
+
+cv:
+  n_folds: 5
+  group: table_id
+
+features:
+  shrinkage_k: 20               # Beta prior strength for lift features
+  window_hands: 25              # rolling window (shared hands) for episodic features
+
+behavior_policy:
+  other_coordination:
+    novelty_percentile: 99
+    max_family_prob: 0.5
+    min_risk_quantile: 0.5

@@ -1,0 +1,31 @@
+# Markdown: only the root README.md is published (SPEC C8)
+*.md
+!/README.md
+
+# Competition data: never commit (SPEC C5)
+data/
+artifacts/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Node
+node_modules/
+web/dist/
+
+# Secrets / local
+.env
+kaggle.json
+access_token
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "suspoker"
+version = "0.1.0"
+description = "Detecting coordinated play (collusion) between poker players, with evidence hands an investigator can review."
+readme = "README.md"
+requires-python = ">=3.13"
+license = { text = "MIT" }
+authors = [{ name = "Rishe" }]
+dependencies = [
+    "numpy==2.5.3",
+    "pandas==3.0.6",
+    "polars==1.44.2",
+    "pyarrow==25.0.1",
+    "duckdb==1.5.6",
+    "pyyaml==6.0.3",
+    "scikit-learn==1.9.1",
+    "lightgbm==4.7.0",
+    "shap==0.52.0",
+]
+
+[project.optional-dependencies]
+game = [
+    "pokerkit==0.7.6",
+    "fastapi==0.142.2",
+    "uvicorn[standard]==0.54.0",
+]
+dev = [
+    "pytest==9.1.1",
+    "ruff==0.16.10",
+    "jupyterlab==4.6.4",
+    "ipykernel==7.4.0",
+    "matplotlib==3.11.2",
+    "nbformat==5.11.1",
+    "nbconvert==7.17.1",
+    "kaggle==2.2.4",
+]
+
+[tool.setuptools.packages.find]
+include = ["suspoker*"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+extend-exclude = ["data", "artifacts", "web"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+# exploratory notebooks favour dense one-off analysis over line-length rules
+"*.ipynb" = ["E501", "E702"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["data: needs the competition data in data/raw (skipped if absent)"]
