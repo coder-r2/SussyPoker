@@ -6,7 +6,7 @@ Counts are kept next to rates, so features.py can compute "vs everyone except th
 import polars as pl
 
 RESPONSE_COUNTS = ["fac", "fold", "call", "raise_", "fac_post", "fold_ahead", "payoff", "payoff_bb",
-                   "fold_strong", "squeeze"]
+                   "fold_strong", "squeeze", "pre_fold_ahead", "pre_junk_call"]
 BIG_LOSS_BB = 20.0
 
 
@@ -18,6 +18,7 @@ def response_counts(ev: pl.DataFrame, keys: list[str]) -> pl.DataFrame:
         pl.col("post").sum().alias("fac_post"),
         pl.col("fold_ahead").sum(), pl.col("payoff").sum(), pl.col("payoff_bb").sum(),
         pl.col("fold_strong").sum(), pl.col("squeeze").sum(),
+        pl.col("pre_fold_ahead").sum(), pl.col("pre_junk_call").sum(),
     )
 
 

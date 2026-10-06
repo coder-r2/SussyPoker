@@ -40,6 +40,10 @@
     "fold_strong_lift_min",
     "squeeze_lift_max",
     "squeeze_lift_min",
+    "pre_fold_ahead_lift_max",
+    "pre_fold_ahead_lift_min",
+    "junk_call_lift_max",
+    "junk_call_lift_min",
     "vpip_pres_max",
     "vpip_pres_min",
     "pfr_pres_max",
@@ -74,7 +78,11 @@
     "hands_max_frac",
     "hands_min_frac"
   ],
+  "cross_period": false,
   "hand_features": [
+    "h_fold_edge_max",
+    "h_call_edge_min",
+    "h_strong_check_partner",
     "h_step_aside",
     "h_both_vpip",
     "h_sd_together",
@@ -94,6 +102,8 @@
     "h_payoff_bb_max",
     "h_fold_strong_max",
     "h_squeeze_max",
+    "h_pre_fold_ahead_max",
+    "h_pre_junk_call_max",
     "h_hu_n",
     "h_hu_check",
     "h_hu_strong_check",
@@ -140,6 +150,10 @@
     "fold_strong_lift_min",
     "squeeze_lift_max",
     "squeeze_lift_min",
+    "pre_fold_ahead_lift_max",
+    "pre_fold_ahead_lift_min",
+    "junk_call_lift_max",
+    "junk_call_lift_min",
     "vpip_pres_max",
     "vpip_pres_min",
     "pfr_pres_max",
@@ -162,8 +176,8 @@
     2
   ],
   "calibration": {
-    "a": 0.938443177967435,
-    "b": -2.1446501906019315
+    "a": 0.8998974971569771,
+    "b": -2.122698596197879
   },
   "none_below_raw": 0.0,
   "behavior_policy": {

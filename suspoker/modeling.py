@@ -28,6 +28,9 @@ EVAL_MIN_SHARED = 38  # smallest shared_hands in evaluation_pairs.csv
 EXPOSURE_COUNTS = ("n_shared", "hands_max", "hands_min")
 PAIR_FEATURES = [c for c in CATALOG if c not in EXPOSURE_COUNTS] + [
     "n_shared_frac", "hands_max_frac", "hands_min_frac"]
+# Cross-period background (DEC-023): the same pair's lift/presence features from the *other* period
+CROSS_BASE = [c for c in PAIR_FEATURES if "_lift" in c or "_pres_" in c] + ["n_shared_frac"]
+CROSS_FEATURES = [f"x_{c}" for c in CROSS_BASE]
 FAMILIES = ("directed_transfer", "soft_play", "coordinated_isolation")
 KEYS = ["player_lo", "player_hi"]
 
@@ -50,6 +53,11 @@ def with_exposure(pf: pl.DataFrame) -> pl.DataFrame:
     return pf.with_columns((pl.col(c) / period).alias(f"{c}_frac") for c in EXPOSURE_COUNTS)
 
 
+def cross_features(pf_other: pl.DataFrame) -> pl.DataFrame:
+    """Pair features from the other period, prefixed `x_`, keyed by the player pair."""
+    return with_exposure(pf_other).select(*KEYS, *[pl.col(c).alias(f"x_{c}") for c in CROSS_BASE])
+
+
 @dataclass
 class DevData:
     labeled: pl.DataFrame   # pair_id, label, behavior_family, table_id, fold, features
@@ -64,7 +72,9 @@ class DevData:
 
 
 def load_dev(pair_features: pl.DataFrame, windows: pl.DataFrame | None = None, n_folds: int | None = None,
-             seed: int | None = None) -> DevData:
+             seed: int | None = None, cross: pl.DataFrame | None = None) -> DevData:
+    """Build the labeled, mirror and window sets. `cross` (evaluation-period pair features) adds the
+    cross-period background columns `x_*` to every view."""
     cfg = load_config()
     n_folds = n_folds or cfg["cv"]["n_folds"]
     seed = cfg["seed"] if seed is None else seed
@@ -103,6 +113,11 @@ def load_dev(pair_features: pl.DataFrame, windows: pl.DataFrame | None = None, n
             # pairs that share no hand inside a window get null features (LightGBM treats them as missing)
             ws = w.filter(pl.col("window_start") == start).select(*KEYS, "n_shared", *PAIR_FEATURES)
             views[start] = meta.join(ws, on=KEYS, how="left", maintain_order="left")
+    if cross is not None:
+        x = cross_features(cross)
+        lab = lab.join(x, on=KEYS, how="left", maintain_order="left")
+        mirror = mirror.join(x, on=KEYS, how="left", maintain_order="left")
+        views = {k: v.join(x, on=KEYS, how="left", maintain_order="left") for k, v in views.items()}
     return DevData(labeled=lab, mirror=mirror, labels=labels, evidence=evidence, windows=views)
 
 

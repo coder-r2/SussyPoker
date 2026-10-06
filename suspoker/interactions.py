@@ -17,12 +17,14 @@ import polars as pl
 from phevaluator import evaluate_cards
 
 from suspoker.cards import NO_CARD, hand_class, preflop_percentile
-from suspoker.ingest import ALL_IN, BET, CALL, FOLD, RAISE, Tables
+from suspoker.ingest import ALL_IN, BET, CALL, CHECK, FOLD, RAISE, Tables
 
 # phevaluator rank boundaries (1 = royal flush ... 7462 = worst high card)
 TWO_PAIR_OR_BETTER = 3325
 PAIR_OR_BETTER = 6185
 PREFLOP_STRONG = 0.85  # top 15% of starting combos
+PRE_AHEAD_MARGIN = 0.10  # preflop "ahead": hand percentile at least 10 points above the aggressor's
+JUNK_PCT = 0.35  # preflop "junk": bottom 35% of starting combos
 
 
 def preflop_lut() -> np.ndarray:
@@ -163,7 +165,10 @@ def response_events(ea: pl.DataFrame) -> pl.DataFrame:
         .select(
             "hand_idx", "table_idx", "phase", "block", "street",
             pl.col("player_idx").alias("x"), pl.col("last_aggr").alias("y"),
-            "resp", "ahead", "behind", "strong", "amount_bb", "players_active",
+            "resp", "ahead", "behind", "strong", "amount_bb", "players_active", "pre_pct",
+            # edge = responder's strength minus the aggressor's: preflop percentile gap, postflop rank gap
+            pl.when(pl.col("street") == 0).then(pl.col("pre_pct") - pl.col("aggr_pre_pct"))
+            .otherwise((pl.col("aggr_rank") - pl.col("rank")) / 7462.0).alias("edge"),
         )
         .with_columns(
             (pl.col("resp") == 0).alias("fold"),
@@ -176,8 +181,24 @@ def response_events(ea: pl.DataFrame) -> pl.DataFrame:
             pl.when((pl.col("resp") >= 1) & pl.col("behind")).then(pl.col("amount_bb")).otherwise(0.0)
             .alias("payoff_bb"),
             ((pl.col("resp") == 2) & (pl.col("players_active") >= 3)).alias("squeeze"),
+            # preflop versions of "fold while ahead" and "pay off while behind" (hole cards are known)
+            ((pl.col("street") == 0) & (pl.col("resp") == 0) & (pl.col("edge") > PRE_AHEAD_MARGIN))
+            .fill_null(False).alias("pre_fold_ahead"),
+            ((pl.col("street") == 0) & (pl.col("resp") >= 1) & (pl.col("pre_pct") < JUNK_PCT) & (pl.col("edge") < 0))
+            .fill_null(False).alias("pre_junk_call"),
         )
     )
+
+
+def strong_checks(ea: pl.DataFrame) -> pl.DataFrame:
+    """X checks a strong made hand (two pair or better) on a postflop street where Y also acts.
+
+    Soft play is not only heads-up: partners also slow-play each other in multiway pots.
+    """
+    checks = ea.filter((pl.col("street") >= 1) & (pl.col("action") == CHECK) & pl.col("strong")).select(
+        "hand_idx", "street", pl.col("player_idx").alias("x"))
+    actors = ea.filter(pl.col("street") >= 1).select("hand_idx", "street", pl.col("player_idx").alias("y")).unique()
+    return checks.join(actors, on=["hand_idx", "street"]).filter(pl.col("x") != pl.col("y"))
 
 
 def flows(t: Tables, ctx: pl.DataFrame) -> pl.DataFrame:

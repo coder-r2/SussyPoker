@@ -27,6 +27,9 @@ features:
   shrinkage_k: 20               # Beta prior strength for lift features
   block_hands: 500              # time block (table hands) for episodic features (F6)
 
+model:
+  cross_period: false           # DEC-023 option B: add the pair's other-period features as background
+
 behavior_policy:
   other_coordination:
     novelty_percentile: 99

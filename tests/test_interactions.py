@@ -94,3 +94,22 @@ def test_seat_pairs(built):
     assert sp.height == 6  # 3 pairs per hand x 2 hands
     # seats 0-1 and 1-2 are neighbours; 0-2 is not (six seats around the table, 5 wraps to 0)
     assert sp["adjacent"].sum() == 4
+
+
+def test_preflop_fold_ahead_and_junk_call_use_hole_card_edge():
+    from suspoker.interactions import response_events
+
+    base = {"hand_idx": 1, "table_idx": 0, "phase": 0, "block": 0, "street": 0, "facing": True, "last_aggr": 9,
+            "ahead": False, "behind": False, "strong": False, "amount_bb": 1.0, "players_active": 3,
+            "aggr_rank": None, "rank": None}
+    rows = [
+        {**base, "player_idx": 1, "resp": 0, "pre_pct": 0.80, "aggr_pre_pct": 0.40},  # folds a much better hand
+        {**base, "player_idx": 2, "resp": 0, "pre_pct": 0.45, "aggr_pre_pct": 0.40},  # folds, only slightly ahead
+        {**base, "player_idx": 3, "resp": 1, "pre_pct": 0.10, "aggr_pre_pct": 0.60},  # calls with junk, behind
+        {**base, "player_idx": 4, "resp": 1, "pre_pct": 0.90, "aggr_pre_pct": 0.60},  # calls with a strong hand
+    ]
+    ev = response_events(pl.DataFrame(rows, schema_overrides={"aggr_rank": pl.Int32, "rank": pl.Int32}))
+    ev = ev.sort("x")
+    assert ev["pre_fold_ahead"].to_list() == [True, False, False, False]
+    assert ev["pre_junk_call"].to_list() == [False, False, True, False]
+    assert ev["edge"].to_list() == pytest.approx([0.40, 0.05, -0.50, 0.30])

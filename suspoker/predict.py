@@ -20,7 +20,7 @@ import polars as pl
 
 from suspoker.config import ARTIFACTS_DIR, MODELS_DIR, RAW_DIR
 from suspoker.metric import EVIDENCE_COLUMNS, NO_EVIDENCE, SUBMISSION_COLUMNS
-from suspoker.modeling import KEYS, hand_context, keyed, matrix, with_exposure
+from suspoker.modeling import KEYS, cross_features, hand_context, keyed, matrix, with_exposure
 from suspoker.pipeline import FEATURES_DIR
 from suspoker.train import FAMILY_PROBS, assign_behavior, calibrate, novelty_percentile, top5
 
@@ -96,6 +96,12 @@ def predict_evaluation(models: Models) -> tuple[pd.DataFrame, pl.DataFrame]:
     pf = with_exposure(pl.read_parquet(FEATURES_DIR / "pair_features.parquet").filter(pl.col("phase") == 1))
     pairs = evals.select("pair_id", *KEYS).join(pf, on=KEYS, how="left", maintain_order="left")
     assert pairs.height == evals.height and pairs["n_shared"].null_count() == 0, "missing evaluation features"
+    if models.meta.get("cross_period"):
+        # background from the pair's latest 2,000 development hands: same exposure as the training-time
+        # background (2,000 evaluation hands) and adjacent in time to the evaluation period (DEC-023)
+        w = pl.read_parquet(FEATURES_DIR / "pair_features_windows.parquet")
+        w = w.filter(pl.col("window_start") == w["window_start"].max())
+        pairs = pairs.join(cross_features(w), on=KEYS, how="left", maintain_order="left")
     scored = score_pairs(models, pairs)
     hands = pl.read_parquet(FEATURES_DIR / "hand_features.parquet").filter(pl.col("phase") == 1)
     evidence = score_evidence(models, hands, scored)

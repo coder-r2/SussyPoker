@@ -33,7 +33,7 @@ def main() -> None:
     rows = []
     for dropped in ["(none)", *families]:
         feats = [f for f in PAIR_FEATURES if family_of(f) != dropped]
-        train.PAIR_FEATURES = feats  # oof_views/risk_training_set read the module-level list
+        train.FEATURES = feats  # oof_views/risk_training_set read the module-level list
         r = train.oof_risk(d)
         rows.append({"dropped": dropped, "n_features": len(feats),
                      "labeled_ap": average_precision(y[lab], r[0][lab]),

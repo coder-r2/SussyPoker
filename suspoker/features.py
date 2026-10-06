@@ -31,6 +31,7 @@ from suspoker.interactions import (
     response_events,
     seat_pairs,
     street_ranks,
+    strong_checks,
 )
 
 PAIR = ["lo", "hi", "phase"]
@@ -45,6 +46,8 @@ RESPONSE_RATES = [
     ("payoff", "payoff", "fac_post"),
     ("fold_strong", "fold_strong", "fac"),
     ("squeeze", "squeeze", "fac"),
+    ("pre_fold_ahead", "pre_fold_ahead", "fac"),
+    ("junk_call", "pre_junk_call", "fac"),
 ]
 
 # name -> (family, plain-English label). Directional stems expand to *_max / *_min.
@@ -81,9 +84,11 @@ CATALOG: dict[str, tuple[str, str]] = {
 }
 _FAMILY_OF_RATE = {"fold": "F3 directed transfer", "call": "F3 directed transfer", "raise": "F4 soft play",
                    "fold_ahead": "F3 directed transfer", "payoff": "F3 directed transfer",
-                   "fold_strong": "F4 soft play", "squeeze": "F5 isolation"}
+                   "fold_strong": "F4 soft play", "squeeze": "F5 isolation",
+                   "pre_fold_ahead": "F3 directed transfer", "junk_call": "F3 directed transfer"}
 _RATE_TEXT = {"fold": "folds", "call": "calls", "raise": "raises", "fold_ahead": "folds while ahead",
-              "payoff": "pays off while behind", "fold_strong": "folds a strong hand", "squeeze": "re-raises multiway"}
+              "payoff": "pays off while behind", "fold_strong": "folds a strong hand", "squeeze": "re-raises multiway",
+              "pre_fold_ahead": "folds a better starting hand preflop", "junk_call": "calls preflop with a junk hand"}
 for _stem, _fam in _FAMILY_OF_RATE.items():
     for _agg, _which in (("max", "the more extreme player"), ("min", "the less extreme player")):
         CATALOG[f"{_stem}_lift_{_agg}"] = (_fam, f"How much more often {_which} {_RATE_TEXT[_stem]} "
@@ -316,7 +321,7 @@ def feature_names() -> list[str]:
 
 
 def hand_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.DataFrame, hu: pl.DataFrame,
-                  ctx: pl.DataFrame, pairs: pl.DataFrame) -> pl.DataFrame:
+                  ctx: pl.DataFrame, pairs: pl.DataFrame, sc: pl.DataFrame) -> pl.DataFrame:
     """Per (pair, shared hand) features for the evidence ranker (M4), for the requested pairs only.
 
     Only *candidate* hands are kept: both put chips in, one responded to the other's aggression, or one
@@ -341,7 +346,18 @@ def hand_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.
                                                  (pl.col("strong_present") & pl.col("checked_through")).sum()
                                                  .alias("hu_strong_check"))
     s = s.join(hh, on=["lo", "hi", "hand_idx"], how="left")
-    s = s.with_columns(pl.col("^.*_(1|2)$").fill_null(0), pl.col("^hu_.*$").fill_null(0))
+    # strength edge at responses between the two (either direction): the most "wrong" fold and call
+    pev = ev.select("hand_idx", pl.min_horizontal("x", "y").alias("lo"), pl.max_horizontal("x", "y").alias("hi"),
+                    "resp", "edge")
+    edges = pev.group_by("lo", "hi", "hand_idx").agg(
+        pl.col("edge").filter(pl.col("resp") == 0).max().alias("h_fold_edge_max"),
+        pl.col("edge").filter(pl.col("resp") >= 1).min().alias("h_call_edge_min"))
+    s = s.join(edges, on=["lo", "hi", "hand_idx"], how="left")
+    scp = sc.select("hand_idx", pl.min_horizontal("x", "y").alias("lo"), pl.max_horizontal("x", "y").alias("hi"))
+    s = s.join(scp.group_by("lo", "hi", "hand_idx").agg(pl.len().alias("h_strong_check_partner")),
+               on=["lo", "hi", "hand_idx"], how="left")
+    s = s.with_columns(pl.col("^.*_(1|2)$").fill_null(0), pl.col("^hu_.*$").fill_null(0),
+                       pl.col("h_strong_check_partner").fill_null(0))
     s = s.with_columns((pl.col("sa_ev_1").cast(pl.Boolean) | pl.col("sa_ev_2").cast(pl.Boolean)).alias("h_step_aside"))
     s = s.filter(((pl.col("contrib_lo") > 0) & (pl.col("contrib_hi") > 0)) | (pl.col("fac_1") + pl.col("fac_2") > 0)
                  | pl.col("h_step_aside"))
@@ -358,7 +374,8 @@ def hand_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.
         pl.min_horizontal("pre_pct_lo", "pre_pct_hi").alias("h_pre_pct_min"),
         (pl.col("fac_1") + pl.col("fac_2")).alias("h_fac"),
         *[pl.max_horizontal(f"{c}_1", f"{c}_2").alias(f"h_{c}_max") for c in
-          ("fold", "call", "raise_", "fold_ahead", "payoff", "payoff_bb", "fold_strong", "squeeze")],
+          ("fold", "call", "raise_", "fold_ahead", "payoff", "payoff_bb", "fold_strong", "squeeze",
+           "pre_fold_ahead", "pre_junk_call")],
         pl.col("hu_n").alias("h_hu_n"), pl.col("hu_check").alias("h_hu_check"),
         pl.col("hu_strong_check").alias("h_hu_strong_check"),
         (pl.col("n_vpip") - pl.col("vpip_lo").cast(pl.Int32) - pl.col("vpip_hi").cast(pl.Int32)).alias("h_third_vpip"),
@@ -390,7 +407,7 @@ def build_chunk(t: Tables, k: float, block_hands: int, hand_pairs: pl.DataFrame 
     hvs = hand_vpip_summary(hp)
     base = player_baselines(hp, ea, ev, hu)
     pf = pair_features(sp, hvs, ev, fl, hu, base, k).join(presence_features(hp, sp, k), on=PAIR, how="left")
-    hf = hand_features(sp, hvs, ev, fl, hu, ctx, hand_pairs) if hand_pairs is not None else None
+    hf = hand_features(sp, hvs, ev, fl, hu, ctx, hand_pairs, strong_checks(ea)) if hand_pairs is not None else None
     return pf, hf, base
 
 

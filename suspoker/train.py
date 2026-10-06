@@ -28,6 +28,7 @@ from sklearn.linear_model import LogisticRegression
 from suspoker.config import ARTIFACTS_DIR, MODELS_DIR, load_config
 from suspoker.metric import EVIDENCE_COLUMNS, NO_EVIDENCE, SUBMISSION_COLUMNS, Score, build_solution, score
 from suspoker.modeling import (
+    CROSS_FEATURES,
     FAMILIES,
     KEYS,
     LGB_BINARY,
@@ -50,6 +51,7 @@ WINDOW_VIEW = 1000          # validation window: development hands 1000-2999 (ev
 NONE_MIN_GAIN = 0.005       # Behavior MAP gain needed before predicting `none` for low-risk pairs
 LGB_EVIDENCE = dict(LGB_BINARY, n_estimators=300)
 NOVELTY_FEATURES = [c for c in PAIR_FEATURES if "_lift" in c or "_pres_" in c]
+FEATURES = list(PAIR_FEATURES)  # M1/M2 inputs; main() appends CROSS_FEATURES when model.cross_period is on
 FAMILY_PROBS = [f"p_{f}" for f in FAMILIES]
 
 
@@ -60,7 +62,7 @@ def risk_training_set(d: DevData, train_mask: pl.Expr, sample_seed: int) -> pl.D
         lab = view.filter(pl.col("labeled") & train_mask)
         unl = view.filter(~pl.col("labeled") & train_mask)
         parts += [lab, unl.sample(min(N_UNLABELED, unl.height), seed=sample_seed + 100 * i)]
-    return pl.concat([p.select("label", "behavior_family", *PAIR_FEATURES) for p in parts])
+    return pl.concat([p.select("label", "behavior_family", *FEATURES) for p in parts])
 
 
 def oof_views(d: DevData, params: dict, train_set, target) -> list[np.ndarray]:
@@ -69,8 +71,8 @@ def oof_views(d: DevData, params: dict, train_set, target) -> list[np.ndarray]:
     for f in range(d.labeled["fold"].max() + 1):
         tr = train_set(f)
         test = (d.mirror["fold"] == f).to_numpy()
-        tests = [matrix(v.filter(pl.Series(test)), PAIR_FEATURES) for v in d.views()]
-        _, models = fit_predict(params, matrix(tr, PAIR_FEATURES), target(tr), seeds=SEEDS)
+        tests = [matrix(v.filter(pl.Series(test)), FEATURES) for v in d.views()]
+        _, models = fit_predict(params, matrix(tr, FEATURES), target(tr), seeds=SEEDS)
         for i, x in enumerate(tests):
             p = predict_proba(models, x)
             if out[i] is None:
@@ -92,7 +94,7 @@ def family_index(df: pl.DataFrame) -> np.ndarray:
 
 def behavior_training_set(d: DevData, train_mask: pl.Expr) -> pl.DataFrame:
     return pl.concat([v.filter(pl.col("labeled") & (pl.col("label") == 1) & train_mask)
-                      .select("behavior_family", *PAIR_FEATURES) for v in d.views()])
+                      .select("behavior_family", *FEATURES) for v in d.views()])
 
 
 def oof_behavior(d: DevData) -> list[np.ndarray]:
@@ -235,11 +237,11 @@ def fit_final(d: DevData, hf: pl.DataFrame, probs_oof: pl.DataFrame, calib: dict
     MODELS_DIR.mkdir(parents=True, exist_ok=True)
     seed = cfg["seed"]
     tr = risk_training_set(d, pl.lit(True), sample_seed=seed)
-    _, m1 = fit_predict(LGB_BINARY, matrix(tr, PAIR_FEATURES), tr["label"].to_numpy(), seeds=SEEDS,
-                        feature_names=PAIR_FEATURES)
+    _, m1 = fit_predict(LGB_BINARY, matrix(tr, FEATURES), tr["label"].to_numpy(), seeds=SEEDS,
+                        feature_names=FEATURES)
     pos = behavior_training_set(d, pl.lit(True))
-    _, m2 = fit_predict(LGB_MULTI, matrix(pos, PAIR_FEATURES), family_index(pos), seeds=SEEDS,
-                        feature_names=PAIR_FEATURES)
+    _, m2 = fit_predict(LGB_MULTI, matrix(pos, FEATURES), family_index(pos), seeds=SEEDS,
+                        feature_names=FEATURES)
     hpos = labeled_evidence_hands(d, hf, probs_oof)
     hfeats = hand_feature_names(hf) + FAMILY_PROBS
     _, m4 = fit_predict(LGB_EVIDENCE, matrix(hpos, hfeats), hpos["y"].to_numpy(), seeds=SEEDS, feature_names=hfeats)
@@ -249,7 +251,8 @@ def fit_final(d: DevData, hf: pl.DataFrame, probs_oof: pl.DataFrame, calib: dict
             m.booster_.save_model(MODELS_DIR / f"{name}_s{s}.txt")
     with open(MODELS_DIR / "m3_novelty.pkl", "wb") as fh:
         pickle.dump(m3, fh)
-    meta = {"pair_features": PAIR_FEATURES, "hand_features": hfeats, "novelty_features": NOVELTY_FEATURES,
+    meta = {"pair_features": FEATURES, "cross_period": any(f.startswith("x_") for f in FEATURES),
+            "hand_features": hfeats, "novelty_features": NOVELTY_FEATURES,
             "families": list(FAMILIES), "seeds": list(SEEDS), "calibration": calib, "none_below_raw": none_below,
             "behavior_policy": cfg["behavior_policy"], "n_unlabeled_negatives_per_view": N_UNLABELED,
             "training_views": ["full development period",
@@ -269,11 +272,15 @@ def main() -> None:
 
     pf = pl.read_parquet(FEATURES_DIR / "pair_features.parquet")
     hf = pl.read_parquet(FEATURES_DIR / "hand_features.parquet")
-    d = load_dev(pf, pl.read_parquet(FEATURES_DIR / "pair_features_windows.parquet"))
+    global FEATURES
+    cross = cfg.get("model", {}).get("cross_period", False)
+    FEATURES = PAIR_FEATURES + (CROSS_FEATURES if cross else [])
+    d = load_dev(pf, pl.read_parquet(FEATURES_DIR / "pair_features_windows.parquet"),
+                 cross=pf.filter(pl.col("phase") == 1) if cross else None)
     mir, win = d.mirror, d.windows[WINDOW_VIEW]
     sols = solutions(d)
     log(f"labeled {d.labeled.height:,} pairs, mirror {mir.height:,} pairs ({mir['label'].mean():.2%} positive), "
-        f"views: full + windows {list(d.windows)}")
+        f"views: full + windows {list(d.windows)}; {len(FEATURES)} pair features (cross-period: {cross})")
 
     results: dict[str, dict] = {}
 
