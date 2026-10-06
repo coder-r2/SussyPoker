@@ -16,7 +16,7 @@ competition:
     pair_ap: 0.70
     evidence_map: 0.20
     behavior_map: 0.10
-  submission_budget_build: 5
+  submission_budget_build: 10  # raised by the owner 2026-10-06; submit only on a local improvement
 
 cv:
   n_folds: 5
