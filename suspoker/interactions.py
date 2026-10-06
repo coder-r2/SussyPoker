@@ -25,6 +25,7 @@ PAIR_OR_BETTER = 6185
 PREFLOP_STRONG = 0.85  # top 15% of starting combos
 PRE_AHEAD_MARGIN = 0.10  # preflop "ahead": hand percentile at least 10 points above the aggressor's
 JUNK_PCT = 0.35  # preflop "junk": bottom 35% of starting combos
+COSTLY_BB = 1.0  # a fold or call that gives up at least 1 bb of expected value (DEC-025)
 
 
 def preflop_lut() -> np.ndarray:
@@ -162,8 +163,9 @@ def response_events(ea: pl.DataFrame) -> pl.DataFrame:
     """X (responder) facing Y (last aggressor): one row per response."""
     return (
         ea.filter(pl.col("facing") & (pl.col("last_aggr") != pl.col("player_idx")))
+        .with_columns(*([] if "eq" in ea.columns else [pl.lit(None, pl.Float64).alias("eq")]))
         .select(
-            "hand_idx", "table_idx", "phase", "block", "street",
+            "hand_idx", "action_no", "table_idx", "phase", "block", "street", "eq", "pot_before", "to_call", "bb",
             pl.col("player_idx").alias("x"), pl.col("last_aggr").alias("y"),
             "resp", "ahead", "behind", "strong", "amount_bb", "players_active", "pre_pct",
             # edge = responder's strength minus the aggressor's: preflop percentile gap, postflop rank gap
@@ -186,6 +188,20 @@ def response_events(ea: pl.DataFrame) -> pl.DataFrame:
             .fill_null(False).alias("pre_fold_ahead"),
             ((pl.col("street") == 0) & (pl.col("resp") >= 1) & (pl.col("pre_pct") < JUNK_PCT) & (pl.col("edge") < 0))
             .fill_null(False).alias("pre_junk_call"),
+            # exact-odds view (DEC-025): expected value of calling = equity x final pot - price, in bb
+            ((pl.col("eq") * (pl.col("pot_before") + pl.col("to_call")) - pl.col("to_call")) / pl.col("bb"))
+            .alias("call_ev_bb"),
+        )
+        .with_columns(
+            pl.when(pl.col("resp") == 0).then(pl.col("call_ev_bb").clip(lower_bound=0)).otherwise(0.0)
+            .fill_null(0.0).alias("fold_cost_bb"),
+            pl.when(pl.col("resp") >= 1).then((-pl.col("call_ev_bb")).clip(lower_bound=0)).otherwise(0.0)
+            .fill_null(0.0).alias("call_cost_bb"),
+        )
+        .with_columns(
+            (pl.col("fold_cost_bb") >= COSTLY_BB).alias("costly_fold"),
+            (pl.col("call_cost_bb") >= COSTLY_BB).alias("costly_call"),
+            (pl.col("fold_cost_bb") + pl.col("call_cost_bb")).alias("ev_gift_bb"),
         )
     )
 

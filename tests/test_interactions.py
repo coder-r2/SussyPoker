@@ -101,15 +101,37 @@ def test_preflop_fold_ahead_and_junk_call_use_hole_card_edge():
 
     base = {"hand_idx": 1, "table_idx": 0, "phase": 0, "block": 0, "street": 0, "facing": True, "last_aggr": 9,
             "ahead": False, "behind": False, "strong": False, "amount_bb": 1.0, "players_active": 3,
-            "aggr_rank": None, "rank": None}
+            "aggr_rank": None, "rank": None, "action_no": 3, "pot_before": 30, "to_call": 10, "bb": 2, "eq": None}
     rows = [
         {**base, "player_idx": 1, "resp": 0, "pre_pct": 0.80, "aggr_pre_pct": 0.40},  # folds a much better hand
         {**base, "player_idx": 2, "resp": 0, "pre_pct": 0.45, "aggr_pre_pct": 0.40},  # folds, only slightly ahead
         {**base, "player_idx": 3, "resp": 1, "pre_pct": 0.10, "aggr_pre_pct": 0.60},  # calls with junk, behind
         {**base, "player_idx": 4, "resp": 1, "pre_pct": 0.90, "aggr_pre_pct": 0.60},  # calls with a strong hand
     ]
-    ev = response_events(pl.DataFrame(rows, schema_overrides={"aggr_rank": pl.Int32, "rank": pl.Int32}))
+    ev = response_events(pl.DataFrame(rows, schema_overrides={"aggr_rank": pl.Int32, "rank": pl.Int32,
+                                                              "eq": pl.Float64}))
     ev = ev.sort("x")
     assert ev["pre_fold_ahead"].to_list() == [True, False, False, False]
     assert ev["pre_junk_call"].to_list() == [False, False, True, False]
     assert ev["edge"].to_list() == pytest.approx([0.40, 0.05, -0.50, 0.30])
+
+
+def test_expected_value_cost_of_folds_and_calls():
+    from suspoker.interactions import response_events
+
+    base = {"hand_idx": 1, "table_idx": 0, "phase": 0, "block": 0, "street": 2, "facing": True, "last_aggr": 9,
+            "ahead": False, "behind": False, "strong": False, "amount_bb": 5.0, "players_active": 2,
+            "aggr_rank": 100, "rank": 200, "pre_pct": 0.5, "aggr_pre_pct": 0.5, "action_no": 7,
+            "pot_before": 30, "to_call": 10, "bb": 2}
+    rows = [
+        {**base, "player_idx": 1, "resp": 0, "eq": 0.8},  # folds an 80% hand: calling was worth 0.8*40-10 = 22
+        {**base, "player_idx": 2, "resp": 1, "eq": 0.1},  # calls with 10%: 0.1*40-10 = -6 chips
+        {**base, "player_idx": 3, "resp": 0, "eq": 0.2},  # folds a hand that should fold: no cost
+        {**base, "player_idx": 4, "resp": 1, "eq": None},  # equity unknown: no cost, no flag
+    ]
+    ev = response_events(pl.DataFrame(rows, schema_overrides={"aggr_rank": pl.Int32, "rank": pl.Int32,
+                                                              "eq": pl.Float64})).sort("x")
+    assert ev["fold_cost_bb"].to_list() == pytest.approx([11.0, 0.0, 0.0, 0.0])
+    assert ev["call_cost_bb"].to_list() == pytest.approx([0.0, 3.0, 0.0, 0.0])
+    assert ev["costly_fold"].to_list() == [True, False, False, False]
+    assert ev["costly_call"].to_list() == [False, True, False, False]

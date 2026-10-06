@@ -1,6 +1,8 @@
-"""Pipeline entry point: python -m suspoker.pipeline --all | --stage S1 | S5 | S5W | S5H | S6
+"""Pipeline entry point: python -m suspoker.pipeline --all | --stage S1 | S2E | S5 | S5W | S5H | S6
 
 S1   ingest raw competition files -> data/interim (integer-coded)
+S2E  exact-odds equity of every response decision (responder vs aggressor), cached in
+     artifacts/features/equity.parquet; S5/S5W/S5H use it for EV-cost features (DEC-025)
 S5   strength, interactions, baselines, pair + hand features -> artifacts/features
      (S2-S4 run inside S5, chunked by table so memory stays bounded)
 S5W  development pair features recomputed on 2,000-hand windows (the evaluation period's length), used to
@@ -51,15 +53,47 @@ def with_string_ids(df: pl.DataFrame, t: Tables) -> pl.DataFrame:
     return out
 
 
+EQUITY_PATH = FEATURES_DIR / "equity.parquet"
+
+
+def load_equity() -> pl.DataFrame | None:
+    return pl.read_parquet(EQUITY_PATH) if EQUITY_PATH.exists() else None
+
+
+def chunk_equity(eq: pl.DataFrame | None, chunk: Tables) -> pl.DataFrame | None:
+    return None if eq is None else eq.join(chunk.hands.select("hand_idx"), on="hand_idx", how="semi")
+
+
+def stage_equity(t: Tables, chunk_tables: int = CHUNK_TABLES) -> None:
+    from suspoker.equity import decision_equity
+    from suspoker.interactions import enrich_actions, hand_context, hand_players, response_events, street_ranks
+
+    cfg = load_config()
+    tables, out, t0 = t.table_ids["table_idx"].to_list(), [], time.perf_counter()
+    for i in range(0, len(tables), chunk_tables):
+        c = t.subset_tables(tables[i:i + chunk_tables])
+        ctx = hand_context(c, cfg["features"]["block_hands"])
+        ev = response_events(enrich_actions(c, ctx, hand_players(c, ctx), street_ranks(c)))
+        out.append(decision_equity(ev.select("hand_idx", "action_no", "street", "x", "y"), c.seats, c.hands,
+                                   seed=cfg["seed"] + i))
+        print(f"  tables {i:>3}-{i + chunk_tables - 1:<3} done  ({time.perf_counter() - t0:5.0f}s)", flush=True)
+    eq = pl.concat(out)
+    FEATURES_DIR.mkdir(parents=True, exist_ok=True)
+    eq.write_parquet(EQUITY_PATH)
+    print(f"S2E done: {eq.height:,} decisions with equity -> {EQUITY_PATH}")
+
+
 def stage_s5(t: Tables, out_dir: Path = FEATURES_DIR, chunk_tables: int = CHUNK_TABLES) -> None:
     cfg = load_config()["features"]
     hand_pairs = requested_hand_pairs(t)
+    equity = load_equity()
     tables = t.table_ids["table_idx"].to_list()
     pfs, hfs, bases = [], [], []
     t0 = time.perf_counter()
     for i in range(0, len(tables), chunk_tables):
         chunk = t.subset_tables(tables[i:i + chunk_tables])
-        pf, hf, base = build_chunk(chunk, k=cfg["shrinkage_k"], block_hands=cfg["block_hands"], hand_pairs=hand_pairs)
+        pf, hf, base = build_chunk(chunk, k=cfg["shrinkage_k"], block_hands=cfg["block_hands"], hand_pairs=hand_pairs,
+                                   equity=chunk_equity(equity, chunk))
         pfs.append(pf)
         hfs.append(hf)
         bases.append(base)
@@ -83,12 +117,13 @@ def window_tables(t: Tables, start: int, length: int = WINDOW_HANDS) -> Tables:
 
 def stage_windows(t: Tables, out_dir: Path = FEATURES_DIR, chunk_tables: int = CHUNK_TABLES) -> None:
     cfg = load_config()["features"]
-    out, t0 = [], time.perf_counter()
+    out, t0, equity = [], time.perf_counter(), load_equity()
     for start in WINDOW_STARTS:
         w = window_tables(t, start)
         tables = w.table_ids["table_idx"].to_list()
         for i in range(0, len(tables), chunk_tables):
-            pf, _, _ = build_chunk(w.subset_tables(tables[i:i + chunk_tables]), k=cfg["shrinkage_k"],
+            wc = w.subset_tables(tables[i:i + chunk_tables])
+            pf, _, _ = build_chunk(wc, k=cfg["shrinkage_k"], equity=chunk_equity(equity, wc),
                                    block_hands=cfg["block_hands"], hand_pairs=None)
             out.append(pf.with_columns(pl.lit(start, pl.Int16).alias("window_start"),
                                        pl.lit(WINDOW_HANDS, pl.Int16).alias("period_hands")))
@@ -114,12 +149,12 @@ def stage_dev_hands(t: Tables, out_dir: Path = DEV_HANDS_DIR, chunk_tables: int 
     out_dir.mkdir(parents=True, exist_ok=True)
     for old in out_dir.glob("part_*.parquet"):
         old.unlink()
-    pos = hand_positions(t)
+    pos, equity = hand_positions(t), load_equity()
     tables, t0, n = t.table_ids["table_idx"].to_list(), time.perf_counter(), 0
     for i in range(0, len(tables), chunk_tables):
         chunk = t.subset_tables(tables[i:i + chunk_tables])
         _, hf, _ = build_chunk(chunk, k=cfg["shrinkage_k"], block_hands=cfg["block_hands"], hand_pairs=None,
-                               dev_min_shared=DEV_MIN_SHARED)
+                               dev_min_shared=DEV_MIN_SHARED, equity=chunk_equity(equity, chunk))
         hf = with_string_ids(hf.join(pos, on="hand_idx"), chunk)
         hf.write_parquet(out_dir / f"part_{i // chunk_tables:02d}.parquet")
         n += hf.height
@@ -132,13 +167,16 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--all", action="store_true")
-    g.add_argument("--stage", choices=["S1", "S5", "S5W", "S5H", "S6"])
+    g.add_argument("--stage", choices=["S1", "S2E", "S5", "S5W", "S5H", "S6"])
     args = p.parse_args(argv)
     if args.all or args.stage == "S1":
         print("S1 ingest ...")
         t = ingest_raw(RAW_DIR, INTERIM_DIR)
-    elif args.stage in ("S5", "S5W", "S5H"):
+    elif args.stage in ("S2E", "S5", "S5W", "S5H"):
         t = Tables.load(INTERIM_DIR)
+    if args.all or args.stage == "S2E":
+        print("S2E decision equity ...")
+        stage_equity(t)
     if args.all or args.stage == "S5":
         print("S5 features ...")
         stage_s5(t)

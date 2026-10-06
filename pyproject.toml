@@ -45,7 +45,7 @@ dev = [
 include = ["suspoker*"]
 
 [tool.setuptools.package-data]
-suspoker = ["resources/*.json"]
+suspoker = ["resources/*.json", "resources/*.npy"]
 
 [tool.ruff]
 line-length = 120

@@ -48,6 +48,9 @@ RESPONSE_RATES = [
     ("squeeze", "squeeze", "fac"),
     ("pre_fold_ahead", "pre_fold_ahead", "fac"),
     ("junk_call", "pre_junk_call", "fac"),
+    ("costly_fold", "costly_fold", "fac"),
+    ("costly_call", "costly_call", "fac"),
+    ("ev_gift", "ev_gift_bb", "fac"),
 ]
 
 # name -> (family, plain-English label). Directional stems expand to *_max / *_min.
@@ -85,10 +88,15 @@ CATALOG: dict[str, tuple[str, str]] = {
 _FAMILY_OF_RATE = {"fold": "F3 directed transfer", "call": "F3 directed transfer", "raise": "F4 soft play",
                    "fold_ahead": "F3 directed transfer", "payoff": "F3 directed transfer",
                    "fold_strong": "F4 soft play", "squeeze": "F5 isolation",
-                   "pre_fold_ahead": "F3 directed transfer", "junk_call": "F3 directed transfer"}
+                   "pre_fold_ahead": "F3 directed transfer", "junk_call": "F3 directed transfer",
+                   "costly_fold": "F3 directed transfer", "costly_call": "F3 directed transfer",
+                   "ev_gift": "F3 directed transfer"}
 _RATE_TEXT = {"fold": "folds", "call": "calls", "raise": "raises", "fold_ahead": "folds while ahead",
               "payoff": "pays off while behind", "fold_strong": "folds a strong hand", "squeeze": "re-raises multiway",
-              "pre_fold_ahead": "folds a better starting hand preflop", "junk_call": "calls preflop with a junk hand"}
+              "pre_fold_ahead": "folds a better starting hand preflop", "junk_call": "calls preflop with a junk hand",
+              "costly_fold": "folds a profitable call (>= 1 bb of expected value)",
+              "costly_call": "makes an unprofitable call (>= 1 bb of expected value)",
+              "ev_gift": "gives up expected value (bb per decision)"}
 for _stem, _fam in _FAMILY_OF_RATE.items():
     for _agg, _which in (("max", "the more extreme player"), ("min", "the less extreme player")):
         CATALOG[f"{_stem}_lift_{_agg}"] = (_fam, f"How much more often {_which} {_RATE_TEXT[_stem]} "
@@ -348,10 +356,12 @@ def hand_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.
     s = s.join(hh, on=["lo", "hi", "hand_idx"], how="left")
     # strength edge at responses between the two (either direction): the most "wrong" fold and call
     pev = ev.select("hand_idx", pl.min_horizontal("x", "y").alias("lo"), pl.max_horizontal("x", "y").alias("hi"),
-                    "resp", "edge")
+                    "resp", "edge", "eq")
     edges = pev.group_by("lo", "hi", "hand_idx").agg(
         pl.col("edge").filter(pl.col("resp") == 0).max().alias("h_fold_edge_max"),
-        pl.col("edge").filter(pl.col("resp") >= 1).min().alias("h_call_edge_min"))
+        pl.col("edge").filter(pl.col("resp") >= 1).min().alias("h_call_edge_min"),
+        pl.col("eq").filter(pl.col("resp") == 0).max().alias("h_fold_eq_max"),
+        pl.col("eq").filter(pl.col("resp") >= 1).min().alias("h_call_eq_min"))
     s = s.join(edges, on=["lo", "hi", "hand_idx"], how="left")
     scp = sc.select("hand_idx", pl.min_horizontal("x", "y").alias("lo"), pl.max_horizontal("x", "y").alias("hi"))
     s = s.join(scp.group_by("lo", "hi", "hand_idx").agg(pl.len().alias("h_strong_check_partner")),
@@ -375,7 +385,7 @@ def hand_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.
         (pl.col("fac_1") + pl.col("fac_2")).alias("h_fac"),
         *[pl.max_horizontal(f"{c}_1", f"{c}_2").alias(f"h_{c}_max") for c in
           ("fold", "call", "raise_", "fold_ahead", "payoff", "payoff_bb", "fold_strong", "squeeze",
-           "pre_fold_ahead", "pre_junk_call")],
+           "pre_fold_ahead", "pre_junk_call", "costly_fold", "costly_call", "ev_gift_bb")],
         pl.col("hu_n").alias("h_hu_n"), pl.col("hu_check").alias("h_hu_check"),
         pl.col("hu_strong_check").alias("h_hu_strong_check"),
         (pl.col("n_vpip") - pl.col("vpip_lo").cast(pl.Int32) - pl.col("vpip_hi").cast(pl.Int32)).alias("h_third_vpip"),
@@ -394,7 +404,8 @@ def hand_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.
 
 
 def build_chunk(t: Tables, k: float, block_hands: int, hand_pairs: pl.DataFrame | None,
-                dev_min_shared: int | None = None) -> tuple[pl.DataFrame, pl.DataFrame | None, pl.DataFrame]:
+                dev_min_shared: int | None = None, equity: pl.DataFrame | None = None
+                ) -> tuple[pl.DataFrame, pl.DataFrame | None, pl.DataFrame]:
     """Run S2-S5 for one chunk of tables. Returns (pair features, hand features, player baselines).
 
     Hand features are built for `hand_pairs`, or, with `dev_min_shared`, for every development pair
@@ -403,6 +414,8 @@ def build_chunk(t: Tables, k: float, block_hands: int, hand_pairs: pl.DataFrame 
     hp = hand_players(t, ctx)
     ranks = street_ranks(t)
     ea = enrich_actions(t, ctx, hp, ranks)
+    if equity is not None:  # cached exact-odds equity per decision (stage S2E)
+        ea = ea.join(equity, on=["hand_idx", "action_no"], how="left")
     ev = response_events(ea)
     fl = flows(t, ctx)
     hu = hu_streets(ea)
