@@ -42,7 +42,8 @@ from suspoker.modeling import (
     matrix,
     predict_proba,
 )
-from suspoker.pipeline import FEATURES_DIR, WINDOW_HANDS
+from suspoker.pipeline import DEV_HANDS_DIR, FEATURES_DIR, WINDOW_HANDS
+from suspoker.suspicion import HS_FEATURES, attach, fit_hand_models, labeled_hands, oof_suspicion
 
 OOF_DIR = ARTIFACTS_DIR / "oof"
 N_UNLABELED = 5000          # unlabeled development pairs added as negatives per view and M1 fit
@@ -56,11 +57,16 @@ FAMILY_PROBS = [f"p_{f}" for f in FAMILIES]
 
 
 # ----------------------------------------------------------------------------- M1 risk
+EXCLUDED_UNLABELED: pl.DataFrame | None = None  # likely hidden colluders kept out of the negatives (DEC-024)
+
+
 def risk_training_set(d: DevData, train_mask: pl.Expr, sample_seed: int) -> pl.DataFrame:
     parts = []
     for i, view in enumerate(d.views()):
         lab = view.filter(pl.col("labeled") & train_mask)
         unl = view.filter(~pl.col("labeled") & train_mask)
+        if EXCLUDED_UNLABELED is not None:
+            unl = unl.join(EXCLUDED_UNLABELED, on="pair_id", how="anti")
         parts += [lab, unl.sample(min(N_UNLABELED, unl.height), seed=sample_seed + 100 * i)]
     return pl.concat([p.select("label", "behavior_family", *FEATURES) for p in parts])
 
@@ -81,9 +87,25 @@ def oof_views(d: DevData, params: dict, train_set, target) -> list[np.ndarray]:
     return out
 
 
-def oof_risk(d: DevData) -> list[np.ndarray]:
-    return oof_views(d, LGB_BINARY, lambda f: risk_training_set(d, pl.col("fold") != f, sample_seed=f),
-                     lambda tr: tr["label"].to_numpy())
+def oof_risk(d: DevData, clean_above: float | None = None) -> list[np.ndarray]:
+    """OOF risk per view. With `clean_above`, a first pass scores every unlabeled pair out of fold, and pairs
+    above the threshold (likely hidden colluders) are excluded from the negatives of the second pass and of
+    the final fit. Their first-pass models saw other folds' labels: a small, second-order leak, accepted as in
+    standard stacking."""
+    global EXCLUDED_UNLABELED
+    EXCLUDED_UNLABELED = None
+
+    def run() -> list[np.ndarray]:
+        return oof_views(d, LGB_BINARY, lambda f: risk_training_set(d, pl.col("fold") != f, sample_seed=f),
+                         lambda tr: tr["label"].to_numpy())
+
+    first = run()
+    if clean_above is None:
+        return first
+    EXCLUDED_UNLABELED = d.mirror.filter(~pl.col("labeled") & pl.Series(first[0] > clean_above)).select("pair_id")
+    print(f"  excluding {EXCLUDED_UNLABELED.height} unlabeled pairs with first-pass risk > {clean_above} "
+          "from the negatives", flush=True)
+    return run()
 
 
 # ----------------------------------------------------------------------------- M2 behavior
@@ -246,12 +268,19 @@ def fit_final(d: DevData, hf: pl.DataFrame, probs_oof: pl.DataFrame, calib: dict
     hfeats = hand_feature_names(hf) + FAMILY_PROBS
     _, m4 = fit_predict(LGB_EVIDENCE, matrix(hpos, hfeats), hpos["y"].to_numpy(), seeds=SEEDS, feature_names=hfeats)
     m3 = fit_novelty(pl.concat([v.select(NOVELTY_FEATURES) for v in d.views()]), seed)
+    hs_cols: list[str] = []
+    if option(cfg, "hand_suspicion"):
+        htrain = labeled_hands(d, dev_hand_parts())
+        hs_cols = [c for c in htrain.columns if c.startswith("h_")]
+        for s, m in zip(SEEDS, fit_hand_models(htrain, hs_cols, SEEDS), strict=True):
+            m.booster_.save_model(MODELS_DIR / f"h_suspicion_s{s}.txt")
     for name, models in (("m1_risk", m1), ("m2_behavior", m2), ("m4_evidence", m4)):
         for s, m in zip(SEEDS, models, strict=True):
             m.booster_.save_model(MODELS_DIR / f"{name}_s{s}.txt")
     with open(MODELS_DIR / "m3_novelty.pkl", "wb") as fh:
         pickle.dump(m3, fh)
     meta = {"pair_features": FEATURES, "cross_period": any(f.startswith("x_") for f in FEATURES),
+            "hand_suspicion": bool(hs_cols), "suspicion_hand_features": hs_cols,
             "hand_features": hfeats, "novelty_features": NOVELTY_FEATURES,
             "families": list(FAMILIES), "seeds": list(SEEDS), "calibration": calib, "none_below_raw": none_below,
             "behavior_policy": cfg["behavior_policy"], "n_unlabeled_negatives_per_view": N_UNLABELED,
@@ -261,22 +290,99 @@ def fit_final(d: DevData, hf: pl.DataFrame, probs_oof: pl.DataFrame, calib: dict
     return meta
 
 
+# ----------------------------------------------------------------------------- repeated CV (experiments)
+EXPERIMENTS = ARTIFACTS_DIR / "experiments.csv"
+OVERRIDES: dict[str, bool | float] = {}  # command-line overrides of config.yaml `model:` options
+
+
+def load_config_with_overrides() -> dict:
+    cfg = load_config()
+    cfg.setdefault("model", {}).update(OVERRIDES)
+    return cfg
+
+
+def option(cfg: dict, name: str):
+    return cfg.get("model", {}).get(name, False)
+
+
+def clean_threshold(cfg: dict) -> float | None:
+    v = option(cfg, "clean_unlabeled")
+    return None if v is False or v is None else float(v)
+
+
+def configure(cfg: dict) -> bool:
+    """Set the M1/M2 feature list from config; returns whether cross-period features are on."""
+    global FEATURES
+    cross = option(cfg, "cross_period")
+    FEATURES = (PAIR_FEATURES + (CROSS_FEATURES if cross else [])
+                + (HS_FEATURES if option(cfg, "hand_suspicion") else []))
+    return cross
+
+
+def dev_hand_parts() -> list:
+    parts = sorted(DEV_HANDS_DIR.glob("part_*.parquet"))
+    assert parts, "run `python -m suspoker.pipeline --stage S5H` first"
+    return parts
+
+
+def load_all(cfg: dict, seed: int | None = None) -> tuple[DevData, pl.DataFrame]:
+    pf = pl.read_parquet(FEATURES_DIR / "pair_features.parquet")
+    hf = pl.read_parquet(FEATURES_DIR / "hand_features.parquet")
+    cross = configure(cfg)
+    d = load_dev(pf, pl.read_parquet(FEATURES_DIR / "pair_features_windows.parquet"), seed=seed,
+                 cross=pf.filter(pl.col("phase") == 1) if cross else None)
+    if option(cfg, "hand_suspicion"):
+        d = attach(d, oof_suspicion(d, dev_hand_parts(), SEEDS))
+    return d, hf
+
+
+def oof_scores(d: DevData, hf: pl.DataFrame, cfg: dict) -> dict[str, Score]:
+    """M1 + M2 (argmax) + M4 out of fold, scored on the three validation sets (M3 omitted: no effect)."""
+    policy = cfg["behavior_policy"]
+    vi = 1 + list(d.windows).index(WINDOW_VIEW)
+    risks, probs = oof_risk(d, clean_threshold(cfg)), oof_behavior(d)
+    probs_df = d.mirror.select("pair_id").with_columns(
+        pl.Series(n, probs[0][:, i]) for i, n in enumerate(FAMILY_PROBS))
+    evidence = top5(oof_evidence(d, hf, probs_df))
+    return evaluate(d, solutions(d), (risks[0], assign_behavior(risks[0], probs[0], None, policy)),
+                    (risks[vi], assign_behavior(risks[vi], probs[vi], None, policy)), evidence)
+
+
+def repeat_cv(tag: str, seeds: list[int]) -> pl.DataFrame:
+    """Run the OOF evaluation under several fold seeds; append rows to artifacts/experiments.csv."""
+    cfg = load_config_with_overrides()
+    rows = []
+    for seed in seeds:
+        t0 = time.perf_counter()
+        d, hf = load_all(cfg, seed)
+        sc = oof_scores(d, hf, cfg)
+        row = {"tag": tag, "seed": seed, "time": time.strftime("%Y-%m-%d %H:%M")}
+        for vset, x in sc.items():
+            row |= {f"{vset}_final": x.final, f"{vset}_pair_ap": x.pair_ap, f"{vset}_evidence": x.evidence_map,
+                    f"{vset}_behavior": x.behavior_map}
+        rows.append(row)
+        print(f"[{tag} seed {seed}] window final {row['window_final']:.4f} (AP {row['window_pair_ap']:.4f}, "
+              f"ev {row['window_evidence']:.4f}) | mirror AP {row['mirror_pair_ap']:.4f} "
+              f"({time.perf_counter() - t0:.0f}s)", flush=True)
+    df = pl.DataFrame(rows)
+    old = pl.read_csv(EXPERIMENTS) if EXPERIMENTS.exists() else None
+    (pl.concat([old, df], how="diagonal_relaxed") if old is not None else df).write_csv(EXPERIMENTS)
+    for c in ("window_final", "window_pair_ap", "window_evidence", "mirror_pair_ap"):
+        print(f"  {c:<16} mean {df[c].mean():.4f}  sd {df[c].std():.4f}")
+    return df
+
+
 # ----------------------------------------------------------------------------- main
 def main() -> None:
     t0 = time.perf_counter()
-    cfg = load_config()
+    cfg = load_config_with_overrides()
     policy = cfg["behavior_policy"]
 
     def log(msg: str) -> None:
         print(f"[{time.perf_counter() - t0:5.0f}s] {msg}", flush=True)
 
-    pf = pl.read_parquet(FEATURES_DIR / "pair_features.parquet")
-    hf = pl.read_parquet(FEATURES_DIR / "hand_features.parquet")
-    global FEATURES
+    d, hf = load_all(cfg)
     cross = cfg.get("model", {}).get("cross_period", False)
-    FEATURES = PAIR_FEATURES + (CROSS_FEATURES if cross else [])
-    d = load_dev(pf, pl.read_parquet(FEATURES_DIR / "pair_features_windows.parquet"),
-                 cross=pf.filter(pl.col("phase") == 1) if cross else None)
     mir, win = d.mirror, d.windows[WINDOW_VIEW]
     sols = solutions(d)
     log(f"labeled {d.labeled.height:,} pairs, mirror {mir.height:,} pairs ({mir['label'].mean():.2%} positive), "
@@ -306,7 +412,7 @@ def main() -> None:
 
     # models, out of fold
     vi = 1 + list(d.windows).index(WINDOW_VIEW)
-    risks = oof_risk(d)
+    risks = oof_risk(d, clean_threshold(cfg))
     risk, risk_w = risks[0], risks[vi]
     log("M1 OOF done")
     probs = oof_behavior(d)
@@ -389,4 +495,21 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import argparse
+
+    ap = argparse.ArgumentParser(description="Train/validate (default) or compare a variant with repeated CV.")
+    ap.add_argument("--repeats", help="comma-separated fold seeds, e.g. 42,43,44: OOF only, no final fit")
+    ap.add_argument("--tag", default="current", help="experiment name for artifacts/experiments.csv")
+    ap.add_argument("--set", action="append", default=[], metavar="model.KEY=true|false",
+                    help="override a model option for this run, e.g. --set model.hand_suspicion=true")
+    args = ap.parse_args()
+    for kv in args.set:
+        key, val = kv.split("=", 1)
+        try:
+            OVERRIDES[key.removeprefix("model.")] = float(val)
+        except ValueError:
+            OVERRIDES[key.removeprefix("model.")] = val.lower() in ("1", "true", "yes")
+    if args.repeats:
+        repeat_cv(args.tag, [int(x) for x in args.repeats.split(",")])
+    else:
+        main()

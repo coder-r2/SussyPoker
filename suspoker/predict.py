@@ -22,6 +22,7 @@ from suspoker.config import ARTIFACTS_DIR, MODELS_DIR, RAW_DIR
 from suspoker.metric import EVIDENCE_COLUMNS, NO_EVIDENCE, SUBMISSION_COLUMNS
 from suspoker.modeling import KEYS, cross_features, hand_context, keyed, matrix, with_exposure
 from suspoker.pipeline import FEATURES_DIR
+from suspoker.suspicion import aggregate, predict_hands
 from suspoker.train import FAMILY_PROBS, assign_behavior, calibrate, novelty_percentile, top5
 
 EVIDENCE_CHUNKS = 8  # evaluation hands are scored in pair chunks to bound memory (3.6M candidate hands)
@@ -91,6 +92,14 @@ def build_submission(scored: pl.DataFrame, evidence: pl.DataFrame, order: pl.Ser
     return sub.select(SUBMISSION_COLUMNS).to_pandas()
 
 
+def hand_suspicion(meta: dict, directory: Path = MODELS_DIR) -> pl.DataFrame:
+    """hs_* features for evaluation pairs: score their candidate hands with H and summarize per pair."""
+    h_models = [lgb.Booster(model_file=str(directory / f"h_suspicion_s{s}.txt")) for s in meta["seeds"]]
+    cols = meta["suspicion_hand_features"]
+    hands = pl.read_parquet(FEATURES_DIR / "hand_features.parquet").filter(pl.col("phase") == 1)
+    return aggregate(hands.select(*KEYS).with_columns(pl.Series("p", predict_hands(h_models, hands, cols))))
+
+
 def predict_evaluation(models: Models) -> tuple[pd.DataFrame, pl.DataFrame]:
     evals = keyed(pl.read_csv(RAW_DIR / "evaluation_pairs.csv"))
     pf = with_exposure(pl.read_parquet(FEATURES_DIR / "pair_features.parquet").filter(pl.col("phase") == 1))
@@ -102,6 +111,8 @@ def predict_evaluation(models: Models) -> tuple[pd.DataFrame, pl.DataFrame]:
         w = pl.read_parquet(FEATURES_DIR / "pair_features_windows.parquet")
         w = w.filter(pl.col("window_start") == w["window_start"].max())
         pairs = pairs.join(cross_features(w), on=KEYS, how="left", maintain_order="left")
+    if models.meta.get("hand_suspicion"):
+        pairs = pairs.join(hand_suspicion(models.meta), on=KEYS, how="left", maintain_order="left")
     scored = score_pairs(models, pairs)
     hands = pl.read_parquet(FEATURES_DIR / "hand_features.parquet").filter(pl.col("phase") == 1)
     evidence = score_evidence(models, hands, scored)

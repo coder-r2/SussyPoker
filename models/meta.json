@@ -76,9 +76,49 @@
     "tilt_vpip_min",
     "n_shared_frac",
     "hands_max_frac",
-    "hands_min_frac"
+    "hands_min_frac",
+    "hs_max",
+    "hs_top3",
+    "hs_top5",
+    "hs_n50",
+    "hs_frac"
   ],
   "cross_period": false,
+  "hand_suspicion": true,
+  "suspicion_hand_features": [
+    "h_fold_edge_max",
+    "h_call_edge_min",
+    "h_strong_check_partner",
+    "h_step_aside",
+    "h_both_vpip",
+    "h_sd_together",
+    "h_pot_bb",
+    "h_board_n",
+    "h_n_vpip",
+    "h_netflow_bb",
+    "h_contrib_max_bb",
+    "h_pre_pct_max",
+    "h_pre_pct_min",
+    "h_fac",
+    "h_fold_max",
+    "h_call_max",
+    "h_raise__max",
+    "h_fold_ahead_max",
+    "h_payoff_max",
+    "h_payoff_bb_max",
+    "h_fold_strong_max",
+    "h_squeeze_max",
+    "h_pre_fold_ahead_max",
+    "h_pre_junk_call_max",
+    "h_hu_n",
+    "h_hu_check",
+    "h_hu_strong_check",
+    "h_third_vpip",
+    "h_weak_open",
+    "h_open_step_aside",
+    "h_open_pct",
+    "h_step_aside_pct"
+  ],
   "hand_features": [
     "h_fold_edge_max",
     "h_call_edge_min",
@@ -176,8 +216,8 @@
     2
   ],
   "calibration": {
-    "a": 0.8998974971569771,
-    "b": -2.122698596197879
+    "a": 0.7140749871113721,
+    "b": -2.6012411014658134
   },
   "none_below_raw": 0.0,
   "behavior_policy": {

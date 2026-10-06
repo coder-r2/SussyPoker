@@ -393,9 +393,12 @@ def hand_features(sp: pl.DataFrame, hvs: pl.DataFrame, ev: pl.DataFrame, fl: pl.
     return out.select("lo", "hi", "phase", "hand_idx", "block", pl.col("^h_.*$"))
 
 
-def build_chunk(t: Tables, k: float, block_hands: int, hand_pairs: pl.DataFrame | None
-                ) -> tuple[pl.DataFrame, pl.DataFrame | None, pl.DataFrame]:
-    """Run S2-S5 for one chunk of tables. Returns (pair features, hand features, player baselines)."""
+def build_chunk(t: Tables, k: float, block_hands: int, hand_pairs: pl.DataFrame | None,
+                dev_min_shared: int | None = None) -> tuple[pl.DataFrame, pl.DataFrame | None, pl.DataFrame]:
+    """Run S2-S5 for one chunk of tables. Returns (pair features, hand features, player baselines).
+
+    Hand features are built for `hand_pairs`, or, with `dev_min_shared`, for every development pair
+    sharing at least that many hands (stage S5H)."""
     ctx = hand_context(t, block_hands)
     hp = hand_players(t, ctx)
     ranks = street_ranks(t)
@@ -407,6 +410,8 @@ def build_chunk(t: Tables, k: float, block_hands: int, hand_pairs: pl.DataFrame 
     hvs = hand_vpip_summary(hp)
     base = player_baselines(hp, ea, ev, hu)
     pf = pair_features(sp, hvs, ev, fl, hu, base, k).join(presence_features(hp, sp, k), on=PAIR, how="left")
+    if dev_min_shared is not None:
+        hand_pairs = pf.filter((pl.col("phase") == 0) & (pl.col("n_shared") >= dev_min_shared)).select(PAIR)
     hf = hand_features(sp, hvs, ev, fl, hu, ctx, hand_pairs, strong_checks(ea)) if hand_pairs is not None else None
     return pf, hf, base
 

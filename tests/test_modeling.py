@@ -99,3 +99,17 @@ def test_load_dev_does_not_depend_on_input_row_order():
     a, b = load_dev(pf), load_dev(pf.sample(fraction=1.0, shuffle=True, seed=1))
     assert a.mirror.equals(b.mirror)
     assert a.mirror.sample(500, seed=3).equals(b.mirror.sample(500, seed=3))
+
+
+def test_hand_suspicion_summaries_per_pair():
+    from suspoker.suspicion import HS_FEATURES, aggregate
+
+    scored = pl.DataFrame({"player_lo": ["a"] * 6 + ["c"], "player_hi": ["b"] * 6 + ["d"],
+                           "p": [0.9, 0.1, 0.8, 0.6, 0.2, 0.0, 0.3]})
+    out = aggregate(scored).sort("player_lo")
+    a = out.row(0, named=True)
+    assert set(HS_FEATURES) <= set(out.columns)
+    assert a["hs_max"] == 0.9 and a["hs_n50"] == 3 and a["hs_frac"] == pytest.approx(0.5)
+    assert a["hs_top3"] == pytest.approx((0.9 + 0.8 + 0.6) / 3)
+    assert a["hs_top5"] == pytest.approx((0.9 + 0.8 + 0.6 + 0.2 + 0.1) / 5)
+    assert out.row(1, named=True)["hs_n50"] == 0

@@ -29,6 +29,8 @@ features:
 
 model:
   cross_period: false           # DEC-023 option B: add the pair's other-period features as background
+  clean_unlabeled: 0.5          # DEC-024: drop unlabeled negatives with first-pass OOF risk above this (e.g. 0.5)
+  hand_suspicion: true          # DEC-024: hand-level "planted-looking hand" model, summarized per pair (hs_*)
 
 behavior_policy:
   other_coordination:

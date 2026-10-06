@@ -1,10 +1,12 @@
-"""Pipeline entry point: python -m suspoker.pipeline --all | --stage S1 | S5 | S5W | S6
+"""Pipeline entry point: python -m suspoker.pipeline --all | --stage S1 | S5 | S5W | S5H | S6
 
 S1   ingest raw competition files -> data/interim (integer-coded)
 S5   strength, interactions, baselines, pair + hand features -> artifacts/features
      (S2-S4 run inside S5, chunked by table so memory stays bounded)
 S5W  development pair features recomputed on 2,000-hand windows (the evaluation period's length), used to
      train and validate at evaluation-like exposure -> artifacts/features/pair_features_windows.parquet
+S5H  hand features for every development pair with >= 57 shared hands (not only labeled ones), written in
+     parts to artifacts/features/dev_hands/; used for hand-suspicion features of M1 (DEC-024)
 S6   models: OOF validation of B0/B1/M1-M4 and the final fit (suspoker.train) -> artifacts/results.json, models/
 """
 
@@ -96,16 +98,46 @@ def stage_windows(t: Tables, out_dir: Path = FEATURES_DIR, chunk_tables: int = C
     print(f"S5W done: {pair.height:,} window pair rows -> {out_dir}")
 
 
+DEV_HANDS_DIR = FEATURES_DIR / "dev_hands"
+DEV_MIN_SHARED = 57  # the evaluation filter (38 shared hands) scaled to the 3,000-hand development period
+
+
+def hand_positions(t: Tables) -> pl.DataFrame:
+    """Position (0-based, started_at order) of every hand within its table and period."""
+    return (t.hands.sort("table_idx", "started_at", "hand_idx")
+            .with_columns(pl.int_range(pl.len()).over("table_idx", "phase").cast(pl.Int32).alias("pos"))
+            .select("hand_idx", "pos"))
+
+
+def stage_dev_hands(t: Tables, out_dir: Path = DEV_HANDS_DIR, chunk_tables: int = CHUNK_TABLES) -> None:
+    cfg = load_config()["features"]
+    out_dir.mkdir(parents=True, exist_ok=True)
+    for old in out_dir.glob("part_*.parquet"):
+        old.unlink()
+    pos = hand_positions(t)
+    tables, t0, n = t.table_ids["table_idx"].to_list(), time.perf_counter(), 0
+    for i in range(0, len(tables), chunk_tables):
+        chunk = t.subset_tables(tables[i:i + chunk_tables])
+        _, hf, _ = build_chunk(chunk, k=cfg["shrinkage_k"], block_hands=cfg["block_hands"], hand_pairs=None,
+                               dev_min_shared=DEV_MIN_SHARED)
+        hf = with_string_ids(hf.join(pos, on="hand_idx"), chunk)
+        hf.write_parquet(out_dir / f"part_{i // chunk_tables:02d}.parquet")
+        n += hf.height
+        print(f"  tables {i:>3}-{i + chunk_tables - 1:<3} done  ({time.perf_counter() - t0:5.0f}s, {n:,} hands)",
+              flush=True)
+    print(f"S5H done: {n:,} development pair-hand rows -> {out_dir}")
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     g = p.add_mutually_exclusive_group(required=True)
     g.add_argument("--all", action="store_true")
-    g.add_argument("--stage", choices=["S1", "S5", "S5W", "S6"])
+    g.add_argument("--stage", choices=["S1", "S5", "S5W", "S5H", "S6"])
     args = p.parse_args(argv)
     if args.all or args.stage == "S1":
         print("S1 ingest ...")
         t = ingest_raw(RAW_DIR, INTERIM_DIR)
-    elif args.stage in ("S5", "S5W"):
+    elif args.stage in ("S5", "S5W", "S5H"):
         t = Tables.load(INTERIM_DIR)
     if args.all or args.stage == "S5":
         print("S5 features ...")
@@ -113,6 +145,9 @@ def main(argv: list[str] | None = None) -> None:
     if args.all or args.stage == "S5W":
         print("S5W windowed development features ...")
         stage_windows(t)
+    if args.all or args.stage == "S5H":
+        print("S5H development hand features ...")
+        stage_dev_hands(t)
     if args.all or args.stage == "S6":
         from suspoker.train import main as train_main  # imported late: train imports this module
 
