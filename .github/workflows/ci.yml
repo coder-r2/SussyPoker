@@ -25,3 +25,21 @@ jobs:
       - name: Test
         # Tests that need the competition data are skipped automatically (data is not in the repo).
         run: pytest -q
+
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Type-check and build
+        # `npm run build` = tsc --noEmit (strict, includes the frozen JSON types) + vite build
+        run: npm run build
