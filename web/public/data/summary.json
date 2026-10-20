@@ -1,6 +1,6 @@
 {
  "generated": "2026-10-20",
- "code_version": "2864479",
+ "code_version": "c209a40",
  "banner": "Simulated hands: every hand on this dashboard was played by our bots in the SimRoom. The detector was trained on the Kaggle competition 'Detect Suspicious Value Transfers in Poker' (Slash); no competition data is shown.",
  "citation": "@misc{detect-suspicious-value-transfers-in-poker, author = {Slash — Detect Suspicious Value Transfers in Poker}, title = {Detect Suspicious Value Transfers in Poker}, year = {2026}, howpublished = {\\url{https://www.kaggle.com/competitions/detect-suspicious-value-transfers-in-poker}}, note = {Kaggle}}",
  "simroom": {
@@ -17,129 +17,129 @@
  },
  "metrics": {
   "population": "every SimRoom pair with at least 38 shared hands (the competition's evaluation filter)",
-  "pairs_scored": 3974,
-  "planted_scored": 34,
+  "pairs_scored": 3959,
+  "planted_scored": 33,
   "planted_total": 37,
-  "decoys_scored": 29,
-  "base_rate": 0.0086,
+  "decoys_scored": 28,
+  "base_rate": 0.0083,
   "models": {
    "M_full": {
-    "final": 0.4223,
-    "pair_ap": 0.3668,
-    "evidence_map": 0.6045,
-    "behavior_map": 0.447,
+    "final": 0.4653,
+    "pair_ap": 0.4148,
+    "evidence_map": 0.6674,
+    "behavior_map": 0.4147,
     "behavior_ap": {
-     "directed_transfer": 0.9606,
-     "soft_play": 0.1193,
-     "coordinated_isolation": 0.261
+     "directed_transfer": 0.842,
+     "soft_play": 0.1325,
+     "coordinated_isolation": 0.2695
     }
    },
    "B0_shared_hands": {
-    "final": 0.04,
-    "pair_ap": 0.0184,
-    "evidence_map": 0.132,
-    "behavior_map": 0.0079,
+    "final": 0.0339,
+    "pair_ap": 0.0199,
+    "evidence_map": 0.0958,
+    "behavior_map": 0.0081,
     "behavior_ap": {
-     "directed_transfer": 0.0108,
-     "soft_play": 0.0044,
+     "directed_transfer": 0.0113,
+     "soft_play": 0.0043,
      "coordinated_isolation": 0.0086
     }
    },
    "B1_net_flow": {
-    "final": 0.0863,
-    "pair_ap": 0.015,
-    "evidence_map": 0.3738,
-    "behavior_map": 0.0107,
+    "final": 0.1053,
+    "pair_ap": 0.0251,
+    "evidence_map": 0.428,
+    "behavior_map": 0.0217,
     "behavior_ap": {
-     "directed_transfer": 0.0192,
-     "soft_play": 0.0044,
+     "directed_transfer": 0.0522,
+     "soft_play": 0.0043,
      "coordinated_isolation": 0.0086
     }
    }
   },
   "break_even": {
-   "k": 34,
-   "tp": 11,
-   "fp": 23,
-   "precision": 0.3235
+   "k": 33,
+   "tp": 14,
+   "fp": 19,
+   "precision": 0.4242
   },
   "recall_by_family": [
    {
     "family": "coordinated_isolation",
     "n": 12,
-    "caught": 0,
-    "median_rank": 431.0,
-    "behavior_correct": 0.8333
+    "caught": 2,
+    "median_rank": 701.0,
+    "behavior_correct": 0.9167
    },
    {
     "family": "directed_transfer",
     "n": 11,
     "caught": 10,
     "median_rank": 6.0,
-    "behavior_correct": 1.0
+    "behavior_correct": 0.9091
    },
    {
     "family": "soft_play",
-    "n": 11,
-    "caught": 1,
-    "median_rank": 146.0,
-    "behavior_correct": 0.6364
+    "n": 10,
+    "caught": 2,
+    "median_rank": 654.0,
+    "behavior_correct": 0.7
    }
   ],
   "decoys": [
    {
     "decoy": "passive_player",
     "n": 6,
-    "best_rank": 135,
-    "median_rank": 972.0,
+    "best_rank": 513,
+    "median_rank": 740.0,
     "in_top_k": 0
    },
    {
     "decoy": "seated_together",
     "n": 10,
-    "best_rank": 36,
-    "median_rank": 2250.5,
+    "best_rank": 66,
+    "median_rank": 2607.0,
     "in_top_k": 0
    },
    {
     "decoy": "similar_styles",
-    "n": 6,
-    "best_rank": 113,
-    "median_rank": 2500.0,
+    "n": 5,
+    "best_rank": 1398,
+    "median_rank": 2644.0,
     "in_top_k": 0
    },
    {
     "decoy": "tilt",
     "n": 7,
-    "best_rank": 770,
-    "median_rank": 2561.0,
+    "best_rank": 1575,
+    "median_rank": 2844.0,
     "in_top_k": 0
    }
   ],
   "detection_by_coordinated_hands": [
    {
     "coordinated": "0-2",
-    "n": 6,
+    "n": 5,
     "caught": 0,
-    "median_rank": 1357.5
+    "median_rank": 2224.0
    },
    {
     "coordinated": "10-19",
-    "n": 9,
-    "caught": 2,
-    "median_rank": 197.0
+    "n": 12,
+    "caught": 5,
+    "median_rank": 333.5
    },
    {
     "coordinated": "20+",
     "n": 8,
-    "caught": 6,
-    "median_rank": 6.5
+    "caught": 7,
+    "median_rank": 7.0
    },
    {
     "coordinated": "3-9",
-    "n": 11,
-    "caught": 3,
-    "median_rank": 93.0
+    "n": 8,
+    "caught": 2,
+    "median_rank": 157.5
    }
   ],
   "families": [
@@ -148,92 +148,92 @@
    "coordinated_isolation"
   ]
  },
- "default_threshold": 0.0934,
+ "default_threshold": 0.1081,
  "calibration": {
   "ok": true,
   "rows": [
    {
     "stat": "vpip",
     "competition": "0.176 / 0.279 / 0.588",
-    "simroom": "0.141 / 0.271 / 0.55",
+    "simroom": "0.143 / 0.27 / 0.54",
     "ok": true
    },
    {
     "stat": "pfr",
     "competition": "0.11 / 0.167 / 0.261",
-    "simroom": "0.0725 / 0.177 / 0.333",
+    "simroom": "0.0747 / 0.16 / 0.329",
     "ok": true
    },
    {
     "stat": "af",
     "competition": "1.28 / 2.18 / 4.29",
-    "simroom": "0.643 / 3.1 / 7.12",
+    "simroom": "0.64 / 3.11 / 7.71",
     "ok": true
    },
    {
     "stat": "wtsd",
     "competition": "0.174 / 0.263 / 0.358",
-    "simroom": "0.158 / 0.259 / 0.413",
+    "simroom": "0.15 / 0.254 / 0.39",
     "ok": true
    },
    {
     "stat": "fold_rate",
     "competition": "0.469 / 0.685 / 0.793",
-    "simroom": "0.501 / 0.689 / 0.819",
+    "simroom": "0.496 / 0.694 / 0.814",
     "ok": true
    },
    {
     "stat": "call_rate",
     "competition": "0.12 / 0.205 / 0.443",
-    "simroom": "0.103 / 0.194 / 0.453",
+    "simroom": "0.106 / 0.198 / 0.462",
     "ok": true
    },
    {
     "stat": "raise_rate",
     "competition": "0.0627 / 0.098 / 0.154",
-    "simroom": "0.0292 / 0.0995 / 0.189",
+    "simroom": "0.027 / 0.0887 / 0.185",
     "ok": true
    },
    {
     "stat": "bet_unopened",
     "competition": "0.365 / 0.486 / 0.619",
-    "simroom": "0.233 / 0.603 / 0.828",
+    "simroom": "0.224 / 0.578 / 0.829",
     "ok": true
    },
    {
     "stat": "net_bb100",
     "competition": "-134 / 0.918 / 132",
-    "simroom": "-103 / 2.38 / 112",
+    "simroom": "-108 / -1.81 / 106",
     "ok": true
    },
    {
     "stat": "pot size (bb)",
     "competition": "1.5 / 9.25 / 184",
-    "simroom": "1.5 / 11.5 / 162",
+    "simroom": "1.5 / 11.5 / 160",
     "ok": true
    },
    {
     "stat": "saw_flop",
     "competition": "0.528",
-    "simroom": "0.514",
+    "simroom": "0.517",
     "ok": true
    },
    {
     "stat": "saw_river",
     "competition": "0.209",
-    "simroom": "0.191",
+    "simroom": "0.196",
     "ok": true
    },
    {
     "stat": "showdown",
     "competition": "0.154",
-    "simroom": "0.153",
+    "simroom": "0.156",
     "ok": true
    },
    {
     "stat": "preflop_fold_share",
     "competition": "0.651",
-    "simroom": "0.672",
+    "simroom": "0.673",
     "ok": true
    }
   ]
@@ -255,6 +255,6 @@
   "soft_play",
   "coordinated_isolation"
  ],
- "detail_pairs": 144,
- "replays": 1678
+ "detail_pairs": 145,
+ "replays": 1693
 }
