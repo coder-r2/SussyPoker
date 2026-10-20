@@ -110,11 +110,16 @@ for _stem, _text in PRESENCE.items():
     for _agg, _which in (("max", "the more extreme player"), ("min", "the less extreme player")):
         CATALOG[f"{_stem}_pres_{_agg}"] = ("F8 presence", f"How much more often {_which} {_text} "
                                                           "when the partner is seated than when not")
-STYLE = ["vpip", "pfr", "af", "wtsd", "fold_rate", "call_rate", "raise_rate", "bet_unopened", "net_bb100",
-         "tilt_vpip", "hands"]
-for _s in STYLE:
-    CATALOG[f"{_s}_max"] = ("F7 controls", f"Higher of the two players' {_s}")
-    CATALOG[f"{_s}_min"] = ("F7 controls", f"Lower of the two players' {_s}")
+STYLE_TEXT = {"vpip": "share of hands entered voluntarily (VPIP)", "pfr": "share of hands raised preflop (PFR)",
+              "af": "postflop aggression (bets and raises per call)", "wtsd": "share of flops taken to showdown",
+              "fold_rate": "fold rate facing a bet", "call_rate": "call rate facing a bet",
+              "raise_rate": "raise rate facing a bet", "bet_unopened": "betting rate when checked to",
+              "net_bb100": "overall win rate (bb per 100 hands)",
+              "tilt_vpip": "extra pots entered right after a big loss (tilt)", "hands": "hands played in the period"}
+STYLE = list(STYLE_TEXT)
+for _s, _text in STYLE_TEXT.items():
+    CATALOG[f"{_s}_max"] = ("F7 controls", f"Higher of the two players' {_text}")
+    CATALOG[f"{_s}_min"] = ("F7 controls", f"Lower of the two players' {_text}")
 
 
 def _lift(ev_y: pl.Expr, opp_y: pl.Expr, ev_all: pl.Expr, opp_all: pl.Expr, global_rate: float, k: float) -> pl.Expr:

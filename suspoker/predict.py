@@ -71,8 +71,10 @@ def score_pairs(models: Models, pairs: pl.DataFrame) -> pl.DataFrame:
         pl.Series("novelty_pct", novelty), pl.Series("predicted_behavior", behavior))
 
 
-def score_evidence(models: Models, hands: pl.DataFrame, scored_pairs: pl.DataFrame) -> pl.DataFrame:
-    """Top-5 evidence hands per pair (wide), from candidate hands with M4."""
+def score_evidence(models: Models, hands: pl.DataFrame, scored_pairs: pl.DataFrame, keep: int | None = None
+                   ) -> pl.DataFrame:
+    """Top-5 evidence hands per pair (wide), from candidate hands with M4. With `keep`, return instead the
+    `keep` best candidates per pair (long), with their hand features and score (for reason tags)."""
     feats = models.meta["hand_features"]
     pairs = scored_pairs.select("pair_id", *KEYS, *FAMILY_PROBS)
     ids = pairs["pair_id"].unique().sort()
@@ -80,7 +82,12 @@ def score_evidence(models: Models, hands: pl.DataFrame, scored_pairs: pl.DataFra
     for chunk in np.array_split(ids.to_numpy(), EVIDENCE_CHUNKS):
         p = pairs.filter(pl.col("pair_id").is_in(chunk.tolist()))
         h = hand_context(hands.join(p, on=KEYS, how="inner").sort("pair_id", "hand_idx"))
-        out.append(top5(h.select("pair_id", "hand_id", pl.Series("score", average(models.m4, matrix(h, feats))))))
+        h = h.with_columns(pl.Series("score", average(models.m4, matrix(h, feats))))
+        if keep is None:
+            out.append(top5(h.select("pair_id", "hand_id", "score")))
+        else:
+            out.append(h.sort(["pair_id", "score"], descending=[False, True], maintain_order=True)
+                       .group_by("pair_id", maintain_order=True).head(keep))
     return pl.concat(out)
 
 
@@ -100,7 +107,8 @@ def hand_suspicion(meta: dict, directory: Path = MODELS_DIR) -> pl.DataFrame:
     return aggregate(hands.select(*KEYS).with_columns(pl.Series("p", predict_hands(h_models, hands, cols))))
 
 
-def predict_evaluation(models: Models) -> tuple[pd.DataFrame, pl.DataFrame]:
+def evaluation_pairs(models: Models) -> pl.DataFrame:
+    """Every evaluation pair (file order) with the M1/M2 inputs from evaluation-period hands."""
     evals = keyed(pl.read_csv(RAW_DIR / "evaluation_pairs.csv"))
     pf = with_exposure(pl.read_parquet(FEATURES_DIR / "pair_features.parquet").filter(pl.col("phase") == 1))
     pairs = evals.select("pair_id", *KEYS).join(pf, on=KEYS, how="left", maintain_order="left")
@@ -113,10 +121,23 @@ def predict_evaluation(models: Models) -> tuple[pd.DataFrame, pl.DataFrame]:
         pairs = pairs.join(cross_features(w), on=KEYS, how="left", maintain_order="left")
     if models.meta.get("hand_suspicion"):
         pairs = pairs.join(hand_suspicion(models.meta), on=KEYS, how="left", maintain_order="left")
+    return pairs
+
+
+def evaluation_hands() -> pl.DataFrame:
+    return pl.read_parquet(FEATURES_DIR / "hand_features.parquet").filter(pl.col("phase") == 1)
+
+
+def evaluation_candidates(models: Models, scored: pl.DataFrame, keep: int = 5) -> pl.DataFrame:
+    """The `keep` best evidence candidates per evaluation pair, with hand features (long)."""
+    return score_evidence(models, evaluation_hands(), scored, keep=keep)
+
+
+def predict_evaluation(models: Models) -> tuple[pd.DataFrame, pl.DataFrame]:
+    pairs = evaluation_pairs(models)
     scored = score_pairs(models, pairs)
-    hands = pl.read_parquet(FEATURES_DIR / "hand_features.parquet").filter(pl.col("phase") == 1)
-    evidence = score_evidence(models, hands, scored)
-    return build_submission(scored, evidence, evals["pair_id"]), scored
+    evidence = score_evidence(models, evaluation_hands(), scored)
+    return build_submission(scored, evidence, pairs["pair_id"]), scored
 
 
 def main(argv: list[str] | None = None) -> None:
