@@ -22,6 +22,7 @@ from phevaluator import evaluate_cards
 from suspoker.cards import NO_CARD
 
 FLOP_SAMPLES = 100
+IN_PROCESS_ROWS = 2000  # below this many postflop decisions, skip the process pool
 N_CLASSES = 169
 
 
@@ -88,7 +89,7 @@ def decision_equity(events: pl.DataFrame, seats: pl.DataFrame, hands: pl.DataFra
         others = (cards.join(post.select("hand_idx", "x", "y").unique(), on="hand_idx")
                   .filter((pl.col("player_idx") != pl.col("x")) & (pl.col("player_idx") != pl.col("y")))
                   .group_by("hand_idx", "x", "y")
-                  .agg(pl.concat_list("c1", "c2").flatten().alias("dead")))
+                  .agg(pl.concat_list("c1", "c2").list.explode(keep_nulls=False, empty_as_null=False).alias("dead")))
         post = post.join(hands.select("hand_idx", "b1", "b2", "b3", "b4", "b5"), on="hand_idx").join(
             others, on=["hand_idx", "x", "y"], how="left")
         post = post.with_columns(pl.col("dead").fill_null([]).list.concat(pl.lit([NO_CARD] * 8))
@@ -96,6 +97,10 @@ def decision_equity(events: pl.DataFrame, seats: pl.DataFrame, hands: pl.DataFra
         dead = np.array(post["dead"].to_list(), dtype=np.int64)
         base = post.select("xc1", "xc2", "yc1", "yc2", "b1", "b2", "b3", "b4", "b5", "street").to_numpy()
         rows = np.hstack([base.astype(np.int64), dead])
+        if workers == 0 or len(rows) < IN_PROCESS_ROWS:  # live game: a few hands, a process pool costs more
+            eq = _postflop_block((rows, seed))
+            out.append(post.select("hand_idx", "action_no").with_columns(pl.Series("eq", eq)))
+            return pl.concat(out)
         workers = workers or max(1, (os.cpu_count() or 2) - 2)
         blocks = np.array_split(rows, max(1, min(len(rows) // 2000, workers * 8)))
         with ProcessPoolExecutor(max_workers=workers) as pool:

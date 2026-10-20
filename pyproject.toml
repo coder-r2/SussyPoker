@@ -39,6 +39,7 @@ dev = [
     "nbconvert==7.17.1",
     "kaggle==2.2.4",
     "treys==0.1.8",
+    "httpx==0.28.1",            # FastAPI TestClient (tests/test_api.py)
 ]
 
 [tool.setuptools.packages.find]
@@ -62,3 +63,4 @@ select = ["E", "F", "W", "I", "B", "UP", "SIM"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 markers = ["data: needs the competition data in data/raw (skipped if absent)"]
+filterwarnings = ["ignore:Using `httpx` with `starlette.testclient`"]

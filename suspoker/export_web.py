@@ -173,6 +173,16 @@ def simroom_card() -> dict | None:
     return _round(out)
 
 
+def live_game_card() -> dict | None:
+    """Detection rates of bot-only Beat the Detector sessions (scripts/simulate_sessions.py), aggregates only."""
+    path = ARTIFACTS_DIR / "game_sessions.json"
+    if not path.exists():
+        return None
+    g = json.loads(path.read_text(encoding="utf-8"))
+    return _round({"sessions_per_config": g["sessions_per_config"], "max_hands": g["max_hands"],
+                   "chance_top1": g["chance_top1"], "summary": g["summary"]})
+
+
 def model_card() -> dict:
     results = json.loads((ARTIFACTS_DIR / "results.json").read_text(encoding="utf-8"))
     meta = json.loads((MODELS_DIR / "meta.json").read_text(encoding="utf-8"))
@@ -197,6 +207,7 @@ def model_card() -> dict:
         "importance": importances(),
         "errors": error_analysis(),
         "simroom": simroom_card(),
+        "live_game": live_game_card(),
         "explanations": {"evidence_tags": {k: t.text for k, t in TAGS.items()},
                          "benign_templates": {k: {"title": b.title, "trigger": b.feature, "tail": b.tail}
                                               for k, b in BENIGN.items()}},

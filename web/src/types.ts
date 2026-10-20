@@ -285,6 +285,108 @@ export interface ModelCard {
     pr_curves: { labeled: PrCurve; window: PrCurve };
   };
   simroom: (SimRoomMetrics & { calibration?: CalibrationRow[] }) | null; // section 9
+  live_game: {
+    sessions_per_config: number;
+    max_hands: number;
+    chance_top1: number;
+    summary: { strategy: string; intensity: number; hands: number; sessions: number; top1: number; top1_flagged: number;
+      median_rank: number; family_right: number | null }[];
+  } | null; // section 9: bot-only Beat the Detector sessions
   explanations: { evidence_tags: Record<string, string>;
     benign_templates: Record<string, { title: string; trigger: string; tail: "high" | "low" }> };
+}
+
+// ------------------------------------------------------------------ game API (Beat the Detector, SPEC §7.9)
+export type Strategy = Family | "honest";
+export type Direction = "partner_to_you" | "you_to_partner";
+
+export interface GameSeat {
+  seat: number; // 0-5; you are always seat 0
+  name: string;
+  is_you: boolean;
+  is_partner: boolean;
+  stack: number;
+  cards: string[] | null; // only yours during play
+  folded: boolean;
+  committed: number; // chips in front on this street
+  last_action: string | null;
+}
+
+export interface GameLegal {
+  fold: boolean;
+  check: boolean;
+  call: boolean;
+  call_amount: number;
+  raise: { min_to: number; max_to: number } | null; // amounts are your total commitment on this street
+  pot: number;
+  committed: number;
+}
+
+export interface GameLogEntry {
+  seat: number;
+  name: string;
+  street: Street;
+  action: ActionName;
+  amount: number;
+  amount_to: number;
+}
+
+export interface LastHand {
+  hand_id: string;
+  board: string[];
+  pot: number;
+  results: { seat: number; name: string; net: number; cards: string[] | null }[]; // cards: yours + showdown only
+}
+
+export interface GameState {
+  session_id: string;
+  strategy: Strategy;
+  intensity: number;
+  direction: Direction | null;
+  you_seat: number;
+  partner_seat: number;
+  partner_name: string;
+  hands_played: number;
+  max_hands: number;
+  finished: boolean;
+  small_blind: number;
+  big_blind: number;
+  hand: { hand_id: string; button_seat: number; street: Street; board: string[]; pot: number; log: GameLogEntry[] } | null;
+  seats: GameSeat[];
+  to_act: number | null;
+  legal: GameLegal | null;
+  last_hand: LastHand | null;
+}
+
+export interface DetectorPair {
+  pair_id: string;
+  rank: number;
+  shared_hands: number;
+  risk: number;
+  behavior: Behavior;
+  probs: FamilyProbs;
+  players: { seat: number; name: string; is_you: boolean; is_partner: boolean }[];
+  you_and_partner: boolean;
+  drivers: { label: string; shap: number }[]; // top 3 reasons pushing the risk up
+  flagged: boolean; // risk >= threshold
+}
+
+export interface DetectorState {
+  status: "insufficient" | "scored";
+  hands: number;
+  needed: number; // shared hands before a verdict (38)
+  threshold: number;
+  pairs: DetectorPair[];
+  you_rank: number | null;
+}
+
+export interface GameReport {
+  verdict: "caught" | "suspected" | "clear" | "insufficient";
+  headline: string;
+  hands: number;
+  you: DetectorPair | null;
+  evidence: { rank: number; hand_id: string; score: number; tags: ReasonTag[]; coordinated: boolean }[];
+  benign_alternative: BenignAlternative | null;
+  bots: { seat: number; name: string; style: string; is_partner: boolean }[];
+  coordinated_hands: string[]; // hands where your partner's collusion changed a decision
 }

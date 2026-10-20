@@ -347,9 +347,10 @@ function SimRoom({ mc }: { mc: Card }) {
         {fmt.num(m.M_full.behavior_ap.directed_transfer, 2)}): chips moving one way look the same in any world. Soft
         play and coordinated isolation mostly do not: they are styles, and the model learned the competition generator's
         version of them, not ours. Detection rises steeply with how often a pair actually colluded. No decoy reaches the
-        flagged list (best decoy rank {Math.min(...s.decoys.map((d) => d.best_rank))}). Live-game detection rates arrive
-        with Beat the Detector.
+        flagged list (best decoy rank {Math.min(...s.decoys.map((d) => d.best_rank))}). In the live game, where partners share
+        every hand, soft play becomes much easier to catch (table below).
       </p>
+      {mc.live_game && <LiveGame g={mc.live_game} />}
       {s.calibration && (
         <>
           <h3>Is the simulator realistic? (calibration)</h3>
@@ -369,6 +370,37 @@ function SimRoom({ mc }: { mc: Card }) {
         </>
       )}
     </Section>
+  );
+}
+
+function LiveGame({ g }: { g: NonNullable<Card["live_game"]> }) {
+  const at = [50, 100, 300].filter((h) => g.summary.some((r) => r.hands === h));
+  const configs = [...new Map(g.summary.map((r) => [`${r.strategy}|${r.intensity}`, r])).values()];
+  const cell = (s: string, i: number, h: number) => g.summary.find((r) => r.strategy === s && r.intensity === i && r.hands === h);
+  return (
+    <>
+      <h3>Live game: how fast is a colluding pair caught?</h3>
+      <p className="small muted">{g.sessions_per_config} bot-only Beat the Detector sessions per row, the user's seat played
+        by bot logic (colluding, or honest for the control). Caught = the (you, partner) pair is the detector's #1 of 15
+        pairs <em>and</em> above the review threshold; in brackets, #1 alone (chance: {fmt.pct(g.chance_top1, 0)}). Live
+        scoring cannot use the presence features (nobody ever leaves the table), which hurts isolation most.</p>
+      <div className="table-wrap">
+        <table className="data">
+          <thead><tr><th>Strategy</th><th><Term k="intensity">Intensity</Term></th>
+            {at.map((h) => <th key={h}>Caught after {h} hands</th>)}</tr></thead>
+          <tbody>
+            {configs.map((r) => (
+              <tr key={`${r.strategy}${r.intensity}`}>
+                <td>{r.strategy === "honest" ? "Honest (control)" : lab(r.strategy)}</td>
+                <td className="num">{r.strategy === "honest" ? "–" : fmt.pct(r.intensity, 0)}</td>
+                {at.map((h) => { const c = cell(r.strategy, r.intensity, h);
+                  return <td key={h} className="num">{c ? `${fmt.pct(c.top1_flagged, 0)} (${fmt.pct(c.top1, 0)})` : "–"}</td>; })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }
 

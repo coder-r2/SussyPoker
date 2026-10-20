@@ -194,8 +194,8 @@ BENIGN: dict[str, Benign] = {
         "may be that player's style, not a favour: check that the folds against the partner exceed their usual rate."),
     "losing_player": Benign(
         "A losing player loses to the whole table", "net_bb100_min", "low",
-        "One player loses {value:.0f} bb per 100 hands overall (worse than {inv:.0f}% of pairs). Chips flowing to the "
-        "partner may be part of losing to everyone."),
+        "One player's overall result is {value:+.0f} bb per 100 hands (worse than {inv:.0f}% of pairs). Chips "
+        "flowing to the partner may be part of losing to everyone."),
     "tilt": Benign(
         "Tilt after big losses", "tilt_vpip_max", "high",
         "One player enters {value:+.0%} more pots right after a big loss (more than {pct:.0f}% of pairs). Reckless "

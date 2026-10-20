@@ -53,9 +53,9 @@ class Style:
 
 
 STYLES = {
-    "TAG": Style("TAG", vpip=0.34, pfr=0.23, three_bet=0.16, limp=0.10, agg=0.75, bluff=0.20, cbet=0.65,
+    "TAG": Style("TAG", vpip=0.34, pfr=0.23, three_bet=0.10, limp=0.10, agg=0.75, bluff=0.20, cbet=0.65,
                  call_down=1.05, size=0.60),
-    "LAG": Style("LAG", vpip=0.45, pfr=0.31, three_bet=0.10, limp=0.10, agg=0.85, bluff=0.35, cbet=0.75,
+    "LAG": Style("LAG", vpip=0.45, pfr=0.31, three_bet=0.16, limp=0.10, agg=0.85, bluff=0.35, cbet=0.75,
                  call_down=0.95, size=0.70),
     "nit": Style("nit", vpip=0.22, pfr=0.15, three_bet=0.06, limp=0.15, agg=0.60, bluff=0.08, cbet=0.50,
                  call_down=1.25, size=0.55),

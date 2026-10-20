@@ -1,0 +1,10 @@
+# Only the API image is built with Docker; keep the build context small and free of competition data.
+data/
+artifacts/
+notebooks/
+web/
+.venv/
+.git/
+**/__pycache__/
+*.md
+!README.md

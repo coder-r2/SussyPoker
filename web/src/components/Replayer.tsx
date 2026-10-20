@@ -3,7 +3,7 @@ import { shortId } from "../format";
 import type { Highlight, HandReplay, ReplayAction } from "../types";
 
 // Seat positions on the oval (percent of the table box), seats 0-5 clockwise from the bottom.
-const SEAT_POS = [
+export const SEAT_POS = [
   [50, 91], [11, 70], [11, 30], [50, 9], [89, 30], [89, 70],
 ];
 const SUIT = { s: "♠", h: "♥", d: "♦", c: "♣" } as Record<string, string>;
@@ -13,6 +13,7 @@ const VERB: Record<string, string> = { fold: "folds", check: "checks", call: "ca
 
 export function Card({ card, big }: { card?: string; big?: boolean }) {
   if (!card) return <span className={`pcard empty${big ? " big" : ""}`} aria-hidden />;
+  if (card === "??") return <span className={`pcard back${big ? " big" : ""}`} aria-label="hidden card" />;
   const suit = card[1];
   const red = suit === "h" || suit === "d";
   return (

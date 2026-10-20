@@ -63,21 +63,37 @@ def equity_table(t: Tables, seed: int, workers: int | None = None) -> pl.DataFra
 
 def score_tables(hands: pl.DataFrame, seats: pl.DataFrame, actions: pl.DataFrame, models: Models,
                  pair_ids: Callable[[str, str], str] = default_pair_id, min_shared: int = EVAL_MIN_SHARED,
-                 keep: int = 5, workers: int | None = None, benign_ref: dict | None = None) -> World:
+                 keep: int = 5, workers: int | None = None, benign_ref: dict | None = None,
+                 equity: pl.DataFrame | None = None, exposure_scale: dict[str, float] | None = None,
+                 neutral: list[str] | None = None, novelty: bool = True) -> World:
     """Score every pair that shared at least `min_shared` hands (the competition's evaluation filter).
-    `benign_ref`: percentiles for the innocent-explanation templates (default: models/benign_reference.json)."""
+    `benign_ref`: percentiles for the innocent-explanation templates (default: models/benign_reference.json).
+    `equity`: precomputed decision equity keyed by (hand_id, action_no), e.g. a live session's cache.
+    `exposure_scale`: divides the exposure shares (`n_shared_frac`, `hands_max_frac`, `hands_min_frac`). At a
+    six-seat game table everyone plays every hand; as six seats of a virtual 30-player pool a pair shares 1/29 of
+    the hands and a player plays 1/5 of them, so a live session uses {n_shared: 29, hands_*: 5} (DEC-030).
+    `neutral`: features that cannot be measured in this setting, set to 0 = "no effect" (a live table where nobody
+    ever leaves cannot measure F8 presence: there are no hands without the partner).
+    `novelty`: run M3 (False for a single small table)."""
     cfg = load_config()
     phases = hands["phase"].unique().to_list()
     if len(phases) != 1:
         raise ValueError("score one period at a time")
     t = encode(hands, seats, actions)
     phase = int(t.hands["phase"][0])
-    eq = equity_table(t, cfg["seed"], workers)
+    if equity is None:
+        eq = equity_table(t, cfg["seed"], workers)
+    else:
+        eq = equity.join(t.hand_ids, on="hand_id").select("hand_idx", "action_no", "eq")
     pf, hf, _ = build_chunk(t, k=cfg["features"]["shrinkage_k"], block_hands=cfg["features"]["block_hands"],
                             hand_pairs=None, dev_min_shared=min_shared, equity=eq, min_shared_phase=phase)
     # exposure features are shares of the period: here a period is each table's own number of hands
-    period = t.hands.group_by("table_idx").agg(pl.len().cast(pl.Int16).alias("period_hands"))
+    period = t.hands.group_by("table_idx").agg(pl.len().cast(pl.Int32).alias("period_hands"))
     pf = with_exposure(pf.filter(pl.col("n_shared") >= min_shared).join(period, on="table_idx"))
+    if exposure_scale:
+        pf = pf.with_columns(pl.col(f"{c}_frac") / s for c, s in exposure_scale.items())
+    if neutral:
+        pf = pf.with_columns(pl.lit(0.0).alias(f) for f in neutral)
     pairs = with_string_ids(pf, t)
     pairs = pairs.with_columns(pl.struct(KEYS).map_elements(lambda r: pair_ids(r["player_lo"], r["player_hi"]),
                                                             return_dtype=pl.String).alias("pair_id"))
@@ -89,7 +105,7 @@ def score_tables(hands: pl.DataFrame, seats: pl.DataFrame, actions: pl.DataFrame
                            how="left")
     pairs = pairs.sort("table_id", "pair_id")
 
-    scored = score_pairs(models, pairs)
+    scored = score_pairs(models, pairs, novelty=novelty)
     pairs = pairs.join(scored.drop(KEYS), on="pair_id", how="left", maintain_order="left")
 
     cand = score_evidence(models, hf.drop("pair_id"), scored, keep=keep)

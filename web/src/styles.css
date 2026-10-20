@@ -231,7 +231,7 @@ table.matrix td { text-align: center; min-width: 54px; font-variant-numeric: tab
 /* mobile */
 @media (max-width: 760px) {
   .replayer { grid-template-columns: 1fr; }
-  .felt-wrap { aspect-ratio: 4 / 5; }
+  .felt-wrap { aspect-ratio: 4 / 5; width: calc(100% - 72px); margin: 0 auto; } /* side seats stay on screen */
   .felt { inset: 12% 14%; }
   .seat { min-width: 86px; padding: 4px 5px; font-size: 0.72rem; }
   .pcard { width: 21px; height: 30px; font-size: 0.72rem; }
@@ -252,3 +252,12 @@ table.matrix td { text-align: center; min-width: 54px; font-variant-numeric: tab
   table.alerts td { border: 0; padding: 3px 8px; }
   table.alerts td[data-label]::before { content: attr(data-label) ": "; color: var(--muted); font-size: 0.8rem; }
 }
+
+/* game */
+.game { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr); gap: 14px; align-items: start; }
+.pcard.back { background: repeating-linear-gradient(45deg, #2a5ea8 0 4px, #1d4a8a 4px 8px); border-color: rgba(255, 255, 255, 0.4); }
+.spinner { display: inline-block; width: 14px; height: 14px; border: 2px solid var(--axis); border-top-color: var(--accent);
+  border-radius: 50%; animation: spin 0.9s linear infinite; vertical-align: -2px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+@media (max-width: 860px) { .game { grid-template-columns: 1fr; } }

@@ -57,18 +57,21 @@ def average(boosters: list[lgb.Booster], X: np.ndarray) -> np.ndarray:
     return np.mean([b.predict(X) for b in boosters], axis=0)
 
 
-def score_pairs(models: Models, pairs: pl.DataFrame) -> pl.DataFrame:
-    """Risk (raw + calibrated), family probabilities, novelty and predicted behavior for each pair row."""
+def score_pairs(models: Models, pairs: pl.DataFrame, novelty: bool = True) -> pl.DataFrame:
+    """Risk (raw + calibrated), family probabilities, novelty and predicted behavior for each pair row.
+    Without `novelty` (live game: 15 pairs are too few for a population percentile), M3 is skipped and
+    other_coordination is never predicted."""
     meta = models.meta
     X = matrix(pairs, meta["pair_features"])
     risk_raw = average(models.m1, X)
     probs = average(models.m2, X)
-    novelty = novelty_percentile(models.m3, pairs)
+    novelty = novelty_percentile(models.m3, pairs) if novelty else None
     behavior = assign_behavior(risk_raw, probs, novelty, meta["behavior_policy"], meta["none_below_raw"])
     return pairs.select("pair_id", *KEYS).with_columns(
         pl.Series("risk_raw", risk_raw), pl.Series("risk", calibrate(risk_raw, meta["calibration"])),
         *[pl.Series(n, probs[:, i]) for i, n in enumerate(FAMILY_PROBS)],
-        pl.Series("novelty_pct", novelty), pl.Series("predicted_behavior", behavior))
+        pl.Series("novelty_pct", novelty if novelty is not None else np.full(len(X), np.nan)),
+        pl.Series("predicted_behavior", behavior))
 
 
 def score_evidence(models: Models, hands: pl.DataFrame, scored_pairs: pl.DataFrame, keep: int | None = None
