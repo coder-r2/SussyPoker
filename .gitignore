@@ -4,6 +4,8 @@
 
 # Competition data: never commit (SPEC C5)
 data/
+# ...except the website's aggregate-only data (leak-checked by suspoker/export_web.py)
+!/web/public/data/
 artifacts/
 
 # Python

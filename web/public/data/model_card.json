@@ -1,0 +1,1662 @@
+{
+ "generated": "2026-10-20",
+ "code_version": "d291a5b",
+ "model": {
+  "pair_features": 88,
+  "hand_features": 50,
+  "feature_families": [
+   "F1 exposure",
+   "F2 chip flow",
+   "F3 directed transfer",
+   "F4 soft play",
+   "F5 isolation",
+   "F6 episodic",
+   "F7 controls",
+   "F8 presence",
+   "F9 hand suspicion"
+  ],
+  "seeds": 3,
+  "behaviors": [
+   "directed_transfer",
+   "soft_play",
+   "coordinated_isolation"
+  ],
+  "calibration": {
+   "a": 0.7132,
+   "b": -2.6143
+  }
+ },
+ "data": {
+  "source": "Kaggle competition 'Detect Suspicious Value Transfers in Poker' (Slash)",
+  "citation": "@misc{detect-suspicious-value-transfers-in-poker, author = {Slash — Detect Suspicious Value Transfers in Poker}, title = {Detect Suspicious Value Transfers in Poker}, year = {2026}, howpublished = {\\url{https://www.kaggle.com/competitions/detect-suspicious-value-transfers-in-poker}}, note = {Kaggle}}",
+  "use": "Trained on the competition's development period. No competition hands, pairs, players or labels are published; this card shows aggregates only."
+ },
+ "validation": {
+  "folds": "StratifiedGroupKFold(5, group=table_id, stratify=behavior_family), seed 42",
+  "views": {
+   "labeled": "1,860 labeled development pairs (20% colluders), full development period",
+   "mirror": "122,580 development pairs that pass the evaluation filter; unlabeled pairs count as innocent (0.3% colluders), full development period",
+   "window": "the same pairs seen through a 2,000-hand window, the length of the evaluation period: the closest local stand-in for the leaderboard"
+  }
+ },
+ "results": [
+  {
+   "model": "B0_shared_hands",
+   "note": "risk = shared hands; behavior = directed_transfer; evidence = biggest pots",
+   "view": "labeled",
+   "final": 0.164,
+   "pair_ap": 0.2042,
+   "evidence_map": 0.0659,
+   "behavior_map": 0.0789
+  },
+  {
+   "model": "B0_shared_hands",
+   "note": "risk = shared hands; behavior = directed_transfer; evidence = biggest pots",
+   "view": "mirror",
+   "final": 0.0155,
+   "pair_ap": 0.0031,
+   "evidence_map": 0.0659,
+   "behavior_map": 0.0014
+  },
+  {
+   "model": "B0_shared_hands",
+   "note": "risk = shared hands; behavior = directed_transfer; evidence = biggest pots",
+   "view": "window",
+   "final": 0.0154,
+   "pair_ap": 0.003,
+   "evidence_map": 0.0659,
+   "behavior_map": 0.0014
+  },
+  {
+   "model": "B1_net_flow",
+   "note": "risk = |net chip flow| per 100 hands; behavior = directed_transfer; evidence = biggest flows",
+   "view": "labeled",
+   "final": 0.4434,
+   "pair_ap": 0.5373,
+   "evidence_map": 0.1833,
+   "behavior_map": 0.3057
+  },
+  {
+   "model": "B1_net_flow",
+   "note": "risk = |net chip flow| per 100 hands; behavior = directed_transfer; evidence = biggest flows",
+   "view": "mirror",
+   "final": 0.1305,
+   "pair_ap": 0.1203,
+   "evidence_map": 0.1833,
+   "behavior_map": 0.0963
+  },
+  {
+   "model": "B1_net_flow",
+   "note": "risk = |net chip flow| per 100 hands; behavior = directed_transfer; evidence = biggest flows",
+   "view": "window",
+   "final": 0.0585,
+   "pair_ap": 0.0284,
+   "evidence_map": 0.1833,
+   "behavior_map": 0.0192
+  },
+  {
+   "model": "M1_M2_no_evid",
+   "note": "M1 risk + M2 argmax, no evidence",
+   "view": "labeled",
+   "final": 0.7985,
+   "pair_ap": 0.9983,
+   "evidence_map": 0.0,
+   "behavior_map": 0.9964
+  },
+  {
+   "model": "M1_M2_no_evid",
+   "note": "M1 risk + M2 argmax, no evidence",
+   "view": "mirror",
+   "final": 0.5909,
+   "pair_ap": 0.7384,
+   "evidence_map": 0.0,
+   "behavior_map": 0.7402
+  },
+  {
+   "model": "M1_M2_no_evid",
+   "note": "M1 risk + M2 argmax, no evidence",
+   "view": "window",
+   "final": 0.5621,
+   "pair_ap": 0.7026,
+   "evidence_map": 0.0,
+   "behavior_map": 0.7035
+  },
+  {
+   "model": "M_full_no_M3",
+   "note": "M1 + M2 (none policy) + M4",
+   "view": "labeled",
+   "final": 0.8922,
+   "pair_ap": 0.9983,
+   "evidence_map": 0.4686,
+   "behavior_map": 0.9964
+  },
+  {
+   "model": "M_full_no_M3",
+   "note": "M1 + M2 (none policy) + M4",
+   "view": "mirror",
+   "final": 0.6846,
+   "pair_ap": 0.7384,
+   "evidence_map": 0.4686,
+   "behavior_map": 0.7402
+  },
+  {
+   "model": "M_full_no_M3",
+   "note": "M1 + M2 (none policy) + M4",
+   "view": "window",
+   "final": 0.6559,
+   "pair_ap": 0.7026,
+   "evidence_map": 0.4686,
+   "behavior_map": 0.7035
+  },
+  {
+   "model": "M_full",
+   "note": "M1 + M2 (none policy) + M3 other_coordination + M4",
+   "view": "labeled",
+   "final": 0.8922,
+   "pair_ap": 0.9983,
+   "evidence_map": 0.4686,
+   "behavior_map": 0.9965
+  },
+  {
+   "model": "M_full",
+   "note": "M1 + M2 (none policy) + M3 other_coordination + M4",
+   "view": "mirror",
+   "final": 0.6846,
+   "pair_ap": 0.7384,
+   "evidence_map": 0.4686,
+   "behavior_map": 0.7402
+  },
+  {
+   "model": "M_full",
+   "note": "M1 + M2 (none policy) + M3 other_coordination + M4",
+   "view": "window",
+   "final": 0.6559,
+   "pair_ap": 0.7026,
+   "evidence_map": 0.4686,
+   "behavior_map": 0.7038
+  }
+ ],
+ "repeated_cv": {
+  "tag": "ev_equity",
+  "fold_seeds": [
+   42,
+   43,
+   44
+  ],
+  "window_final": {
+   "mean": 0.651,
+   "sd": 0.0043
+  },
+  "window_pair_ap": {
+   "mean": 0.6974,
+   "sd": 0.0048
+  },
+  "window_evidence": {
+   "mean": 0.4647,
+   "sd": 0.0048
+  },
+  "window_behavior": {
+   "mean": 0.6989,
+   "sd": 0.0047
+  },
+  "mirror_pair_ap": {
+   "mean": 0.7269,
+   "sd": 0.0117
+  }
+ },
+ "kaggle": {
+  "note": "Late submissions after the competition closed: scored by Kaggle, not ranked. Ranks are estimates against the final public leaderboard.",
+  "leaderboard": {
+   "teams": 368,
+   "median": 0.805,
+   "p90": 0.9,
+   "top": 0.935
+  },
+  "submissions": [
+   {
+    "n": 1,
+    "commit": "8422fef",
+    "change": "P3 model: risk, behavior, novelty and evidence models",
+    "local_window_final": 0.606,
+    "public": 0.78585,
+    "private": 0.79167
+   },
+   {
+    "n": 2,
+    "commit": "6ca4b28",
+    "change": "Preflop edge signatures (folding a better hand, junk calls)",
+    "local_window_final": 0.622,
+    "public": 0.82451,
+    "private": 0.82328
+   },
+   {
+    "n": 3,
+    "commit": "33e95f4",
+    "change": "Hand-suspicion features, cleaned training negatives, repeated CV",
+    "local_window_final": 0.6458,
+    "public": 0.83251,
+    "private": 0.83775
+   },
+   {
+    "n": 4,
+    "commit": "05f7db7",
+    "change": "Exact-odds decision equity and expected-value cost features",
+    "local_window_final": 0.651,
+    "public": 0.83107,
+    "private": 0.83579,
+    "deployed": true
+   }
+  ]
+ },
+ "ablation": {
+  "note": "P3 model (73 features); drop one family at a time, 1 fold seed",
+  "rows": [
+   {
+    "dropped": "(none)",
+    "n_features": 73,
+    "labeled_ap": 0.9895,
+    "mirror_ap": 0.7025,
+    "window_ap": 0.6591,
+    "window_delta": 0.0,
+    "mirror_delta": 0.0
+   },
+   {
+    "dropped": "F1 exposure",
+    "n_features": 67,
+    "labeled_ap": 0.9895,
+    "mirror_ap": 0.7046,
+    "window_ap": 0.6645,
+    "window_delta": 0.0054,
+    "mirror_delta": 0.0021
+   },
+   {
+    "dropped": "F2 chip flow",
+    "n_features": 67,
+    "labeled_ap": 0.9895,
+    "mirror_ap": 0.6968,
+    "window_ap": 0.6611,
+    "window_delta": 0.002,
+    "mirror_delta": -0.0057
+   },
+   {
+    "dropped": "F3 directed transfer",
+    "n_features": 63,
+    "labeled_ap": 0.9888,
+    "mirror_ap": 0.6875,
+    "window_ap": 0.6392,
+    "window_delta": -0.0199,
+    "mirror_delta": -0.015
+   },
+   {
+    "dropped": "F4 soft play",
+    "n_features": 67,
+    "labeled_ap": 0.9894,
+    "mirror_ap": 0.7004,
+    "window_ap": 0.6527,
+    "window_delta": -0.0065,
+    "mirror_delta": -0.0021
+   },
+   {
+    "dropped": "F5 isolation",
+    "n_features": 67,
+    "labeled_ap": 0.9887,
+    "mirror_ap": 0.6927,
+    "window_ap": 0.6426,
+    "window_delta": -0.0166,
+    "mirror_delta": -0.0098
+   },
+   {
+    "dropped": "F6 episodic",
+    "n_features": 68,
+    "labeled_ap": 0.9897,
+    "mirror_ap": 0.7015,
+    "window_ap": 0.6592,
+    "window_delta": 0.0001,
+    "mirror_delta": -0.001
+   },
+   {
+    "dropped": "F7 controls",
+    "n_features": 49,
+    "labeled_ap": 0.9888,
+    "mirror_ap": 0.6795,
+    "window_ap": 0.6512,
+    "window_delta": -0.0079,
+    "mirror_delta": -0.023
+   },
+   {
+    "dropped": "F8 presence",
+    "n_features": 63,
+    "labeled_ap": 0.9742,
+    "mirror_ap": 0.6262,
+    "window_ap": 0.532,
+    "window_delta": -0.1272,
+    "mirror_delta": -0.0763
+   }
+  ]
+ },
+ "importance": {
+  "population": "evaluation pairs (final models, mean |SHAP| in log-odds)",
+  "risk": [
+   {
+    "feature": "hs_max",
+    "family": "F9 hand suspicion",
+    "label": "How planted-looking their most suspicious shared hand is",
+    "mean_abs_shap": 0.3184
+   },
+   {
+    "feature": "hs_top3",
+    "family": "F9 hand suspicion",
+    "label": "Average suspicion of their 3 most suspicious shared hands",
+    "mean_abs_shap": 0.2665
+   },
+   {
+    "feature": "vpip_pres_max",
+    "family": "F8 presence",
+    "label": "How much more often the more extreme player enters pots voluntarily when the partner is seated than when not",
+    "mean_abs_shap": 0.2272
+   },
+   {
+    "feature": "step_aside_lift_max",
+    "family": "F5 isolation",
+    "label": "How much more often a player folds preflop once the partner has entered than once anyone else has (larger direction)",
+    "mean_abs_shap": 0.2005
+   },
+   {
+    "feature": "iso_opp_rate",
+    "family": "F5 isolation",
+    "label": "Multiway pots both partners entered, per shared hand",
+    "mean_abs_shap": 0.1952
+   },
+   {
+    "feature": "pfr_pres_min",
+    "family": "F8 presence",
+    "label": "How much more often the less extreme player raises preflop when the partner is seated than when not",
+    "mean_abs_shap": 0.1806
+   },
+   {
+    "feature": "hs_frac",
+    "family": "F9 hand suspicion",
+    "label": "Share of their contested hands that look more planted than not",
+    "mean_abs_shap": 0.1759
+   },
+   {
+    "feature": "vpip_max",
+    "family": "F7 controls",
+    "label": "Higher of the two players' share of hands entered voluntarily (VPIP)",
+    "mean_abs_shap": 0.1545
+   },
+   {
+    "feature": "vpip_pres_min",
+    "family": "F8 presence",
+    "label": "How much more often the less extreme player enters pots voluntarily when the partner is seated than when not",
+    "mean_abs_shap": 0.1494
+   },
+   {
+    "feature": "step_aside_lift_min",
+    "family": "F5 isolation",
+    "label": "Same, smaller direction",
+    "mean_abs_shap": 0.1385
+   },
+   {
+    "feature": "pfr_pres_max",
+    "family": "F8 presence",
+    "label": "How much more often the more extreme player raises preflop when the partner is seated than when not",
+    "mean_abs_shap": 0.1366
+   },
+   {
+    "feature": "tilt_vpip_max",
+    "family": "F7 controls",
+    "label": "Higher of the two players' extra pots entered right after a big loss (tilt)",
+    "mean_abs_shap": 0.1147
+   },
+   {
+    "feature": "hs_top5",
+    "family": "F9 hand suspicion",
+    "label": "Average suspicion of their 5 most suspicious shared hands",
+    "mean_abs_shap": 0.114
+   },
+   {
+    "feature": "iso_lift",
+    "family": "F5 isolation",
+    "label": "Third players pushed out when both partners enter, vs usual rate",
+    "mean_abs_shap": 0.1084
+   },
+   {
+    "feature": "wopen_pres_max",
+    "family": "F8 presence",
+    "label": "How much more often the more extreme player opens with a weak hand when the partner is seated than when not",
+    "mean_abs_shap": 0.1005
+   },
+   {
+    "feature": "both_contrib_rate",
+    "family": "F1 exposure",
+    "label": "Share of shared hands where both put chips in (incl. blinds)",
+    "mean_abs_shap": 0.0946
+   },
+   {
+    "feature": "wvpip_pres_min",
+    "family": "F8 presence",
+    "label": "How much more often the less extreme player enters with a weak hand when the partner is seated than when not",
+    "mean_abs_shap": 0.0938
+   },
+   {
+    "feature": "n_shared_frac",
+    "family": "F1 exposure",
+    "label": "Share of the period's table hands they played together",
+    "mean_abs_shap": 0.0845
+   },
+   {
+    "feature": "junk_call_lift_max",
+    "family": "F3 directed transfer",
+    "label": "How much more often the more extreme player calls preflop with a junk hand facing the partner than facing others",
+    "mean_abs_shap": 0.0786
+   },
+   {
+    "feature": "raise_rate_max",
+    "family": "F7 controls",
+    "label": "Higher of the two players' raise rate facing a bet",
+    "mean_abs_shap": 0.0772
+   },
+   {
+    "feature": "hands_min_frac",
+    "family": "F7 controls",
+    "label": "Share of the period's hands played by the less active player",
+    "mean_abs_shap": 0.0753
+   },
+   {
+    "feature": "call_lift_max",
+    "family": "F3 directed transfer",
+    "label": "How much more often the more extreme player calls facing the partner than facing others",
+    "mean_abs_shap": 0.0722
+   },
+   {
+    "feature": "hu_strong_check_lift",
+    "family": "F4 soft play",
+    "label": "Strong hands checked down heads-up vs usual rate",
+    "mean_abs_shap": 0.0684
+   },
+   {
+    "feature": "raise_lift_max",
+    "family": "F4 soft play",
+    "label": "How much more often the more extreme player raises facing the partner than facing others",
+    "mean_abs_shap": 0.0677
+   },
+   {
+    "feature": "wvpip_pres_max",
+    "family": "F8 presence",
+    "label": "How much more often the more extreme player enters with a weak hand when the partner is seated than when not",
+    "mean_abs_shap": 0.0675
+   }
+  ],
+  "risk_by_family": [
+   {
+    "family": "F8 presence",
+    "mean_abs_shap": 1.0454,
+    "n_features": 10,
+    "share": 0.2158
+   },
+   {
+    "family": "F7 controls",
+    "mean_abs_shap": 0.9667,
+    "n_features": 24,
+    "share": 0.1995
+   },
+   {
+    "family": "F9 hand suspicion",
+    "mean_abs_shap": 0.897,
+    "n_features": 5,
+    "share": 0.1852
+   },
+   {
+    "family": "F5 isolation",
+    "mean_abs_shap": 0.7354,
+    "n_features": 6,
+    "share": 0.1518
+   },
+   {
+    "family": "F3 directed transfer",
+    "mean_abs_shap": 0.4993,
+    "n_features": 20,
+    "share": 0.1031
+   },
+   {
+    "family": "F1 exposure",
+    "mean_abs_shap": 0.2803,
+    "n_features": 6,
+    "share": 0.0579
+   },
+   {
+    "family": "F4 soft play",
+    "mean_abs_shap": 0.2161,
+    "n_features": 6,
+    "share": 0.0446
+   },
+   {
+    "family": "F6 episodic",
+    "mean_abs_shap": 0.1401,
+    "n_features": 5,
+    "share": 0.0289
+   },
+   {
+    "family": "F2 chip flow",
+    "mean_abs_shap": 0.0643,
+    "n_features": 6,
+    "share": 0.0133
+   }
+  ],
+  "behavior": {
+   "directed_transfer": [
+    {
+     "feature": "call_lift_max",
+     "family": "F3 directed transfer",
+     "label": "How much more often the more extreme player calls facing the partner than facing others",
+     "mean_abs_shap": 0.8572
+    },
+    {
+     "feature": "vpip_pres_max",
+     "family": "F8 presence",
+     "label": "How much more often the more extreme player enters pots voluntarily when the partner is seated than when not",
+     "mean_abs_shap": 0.663
+    },
+    {
+     "feature": "junk_call_lift_max",
+     "family": "F3 directed transfer",
+     "label": "How much more often the more extreme player calls preflop with a junk hand facing the partner than facing others",
+     "mean_abs_shap": 0.5502
+    },
+    {
+     "feature": "blk_call_lift_max",
+     "family": "F6 episodic",
+     "label": "Highest call-vs-partner lift in any time block",
+     "mean_abs_shap": 0.2376
+    },
+    {
+     "feature": "hu_check_lift",
+     "family": "F4 soft play",
+     "label": "Heads-up streets checked through vs each player's usual rate",
+     "mean_abs_shap": 0.2355
+    },
+    {
+     "feature": "pfr_pres_max",
+     "family": "F8 presence",
+     "label": "How much more often the more extreme player raises preflop when the partner is seated than when not",
+     "mean_abs_shap": 0.1566
+    },
+    {
+     "feature": "hs_max",
+     "family": "F9 hand suspicion",
+     "label": "How planted-looking their most suspicious shared hand is",
+     "mean_abs_shap": 0.1557
+    },
+    {
+     "feature": "squeeze_lift_max",
+     "family": "F5 isolation",
+     "label": "How much more often the more extreme player re-raises multiway facing the partner than facing others",
+     "mean_abs_shap": 0.14
+    },
+    {
+     "feature": "loss_share_lr_max",
+     "family": "F2 chip flow",
+     "label": "How over-concentrated one player's losses are on the partner (log ratio)",
+     "mean_abs_shap": 0.0798
+    },
+    {
+     "feature": "hs_top5",
+     "family": "F9 hand suspicion",
+     "label": "Average suspicion of their 5 most suspicious shared hands",
+     "mean_abs_shap": 0.0759
+    }
+   ],
+   "soft_play": [
+    {
+     "feature": "junk_call_lift_max",
+     "family": "F3 directed transfer",
+     "label": "How much more often the more extreme player calls preflop with a junk hand facing the partner than facing others",
+     "mean_abs_shap": 1.0013
+    },
+    {
+     "feature": "pfr_pres_max",
+     "family": "F8 presence",
+     "label": "How much more often the more extreme player raises preflop when the partner is seated than when not",
+     "mean_abs_shap": 0.9026
+    },
+    {
+     "feature": "step_aside_lift_max",
+     "family": "F5 isolation",
+     "label": "How much more often a player folds preflop once the partner has entered than once anyone else has (larger direction)",
+     "mean_abs_shap": 0.4574
+    },
+    {
+     "feature": "pfr_pres_min",
+     "family": "F8 presence",
+     "label": "How much more often the less extreme player raises preflop when the partner is seated than when not",
+     "mean_abs_shap": 0.3393
+    },
+    {
+     "feature": "conf_rate",
+     "family": "F1 exposure",
+     "label": "Confrontations (one facing the other's bet) per shared hand",
+     "mean_abs_shap": 0.2866
+    },
+    {
+     "feature": "vpip_pres_max",
+     "family": "F8 presence",
+     "label": "How much more often the more extreme player enters pots voluntarily when the partner is seated than when not",
+     "mean_abs_shap": 0.2464
+    },
+    {
+     "feature": "iso_opp_rate",
+     "family": "F5 isolation",
+     "label": "Multiway pots both partners entered, per shared hand",
+     "mean_abs_shap": 0.1961
+    },
+    {
+     "feature": "raise_lift_max",
+     "family": "F4 soft play",
+     "label": "How much more often the more extreme player raises facing the partner than facing others",
+     "mean_abs_shap": 0.1562
+    },
+    {
+     "feature": "wopen_pres_max",
+     "family": "F8 presence",
+     "label": "How much more often the more extreme player opens with a weak hand when the partner is seated than when not",
+     "mean_abs_shap": 0.1437
+    },
+    {
+     "feature": "hu_strong_check_lift",
+     "family": "F4 soft play",
+     "label": "Strong hands checked down heads-up vs usual rate",
+     "mean_abs_shap": 0.1425
+    }
+   ],
+   "coordinated_isolation": [
+    {
+     "feature": "squeeze_lift_max",
+     "family": "F5 isolation",
+     "label": "How much more often the more extreme player re-raises multiway facing the partner than facing others",
+     "mean_abs_shap": 0.5917
+    },
+    {
+     "feature": "pre_fold_ahead_lift_max",
+     "family": "F3 directed transfer",
+     "label": "How much more often the more extreme player folds a better starting hand preflop facing the partner than facing others",
+     "mean_abs_shap": 0.5173
+    },
+    {
+     "feature": "call_lift_max",
+     "family": "F3 directed transfer",
+     "label": "How much more often the more extreme player calls facing the partner than facing others",
+     "mean_abs_shap": 0.3389
+    },
+    {
+     "feature": "squeeze_lift_min",
+     "family": "F5 isolation",
+     "label": "How much more often the less extreme player re-raises multiway facing the partner than facing others",
+     "mean_abs_shap": 0.3293
+    },
+    {
+     "feature": "wopen_pres_max",
+     "family": "F8 presence",
+     "label": "How much more often the more extreme player opens with a weak hand when the partner is seated than when not",
+     "mean_abs_shap": 0.295
+    },
+    {
+     "feature": "pfr_pres_min",
+     "family": "F8 presence",
+     "label": "How much more often the less extreme player raises preflop when the partner is seated than when not",
+     "mean_abs_shap": 0.2733
+    },
+    {
+     "feature": "pre_fold_ahead_lift_min",
+     "family": "F3 directed transfer",
+     "label": "How much more often the less extreme player folds a better starting hand preflop facing the partner than facing others",
+     "mean_abs_shap": 0.2534
+    },
+    {
+     "feature": "wopen_pres_min",
+     "family": "F8 presence",
+     "label": "How much more often the less extreme player opens with a weak hand when the partner is seated than when not",
+     "mean_abs_shap": 0.1397
+    },
+    {
+     "feature": "raise_lift_min",
+     "family": "F4 soft play",
+     "label": "How much more often the less extreme player raises facing the partner than facing others",
+     "mean_abs_shap": 0.0896
+    },
+    {
+     "feature": "step_aside_lift_max",
+     "family": "F5 isolation",
+     "label": "How much more often a player folds preflop once the partner has entered than once anyone else has (larger direction)",
+     "mean_abs_shap": 0.07
+    }
+   ]
+  }
+ },
+ "errors": {
+  "operating_point": "break-even cut on the window view: the K highest-risk pairs, K = number of colluders",
+  "counts": {
+   "k": 372,
+   "TP": 280,
+   "FP": 92,
+   "FN": 92,
+   "TN": 122116,
+   "precision": 0.7527,
+   "recall": 0.7527,
+   "fp_confirmed_negative": 0,
+   "fp_unlabeled": 92,
+   "best_confirmed_negative_rank": 385,
+   "confirmed_negatives": 1488
+  },
+  "recall_by_family": [
+   {
+    "behavior_family": "coordinated_isolation",
+    "positives": 92,
+    "caught": 69,
+    "median_rank": 242.5,
+    "recall": 0.75,
+    "missed": 23
+   },
+   {
+    "behavior_family": "directed_transfer",
+    "positives": 148,
+    "caught": 115,
+    "median_rank": 207.5,
+    "recall": 0.777,
+    "missed": 33
+   },
+   {
+    "behavior_family": "soft_play",
+    "positives": 132,
+    "caught": 96,
+    "median_rank": 282.5,
+    "recall": 0.7273,
+    "missed": 36
+   }
+  ],
+  "decoy_rates": [
+   {
+    "outcome": "FN",
+    "pairs": 92,
+    "passive_player": 0.0761,
+    "losing_player": 0.163,
+    "tilt": 0.0978,
+    "aggressive_player": 0.0652,
+    "similar_styles": 0.0109,
+    "schedule_overlap": 0.0652,
+    "small_sample": 0.1739,
+    "neighbours": 0.1304
+   },
+   {
+    "outcome": "FP",
+    "pairs": 92,
+    "passive_player": 0.0,
+    "losing_player": 0.1522,
+    "tilt": 0.0761,
+    "aggressive_player": 0.087,
+    "similar_styles": 0.0978,
+    "schedule_overlap": 0.1304,
+    "small_sample": 0.087,
+    "neighbours": 0.1739
+   },
+   {
+    "outcome": "TN",
+    "pairs": 122116,
+    "passive_player": 0.11,
+    "losing_player": 0.0996,
+    "tilt": 0.11,
+    "aggressive_player": 0.1095,
+    "similar_styles": 0.0999,
+    "schedule_overlap": 0.1082,
+    "small_sample": 0.0998,
+    "neighbours": 0.1098
+   },
+   {
+    "outcome": "TP",
+    "pairs": 280,
+    "passive_player": 0.0571,
+    "losing_player": 0.1857,
+    "tilt": 0.0857,
+    "aggressive_player": 0.1179,
+    "similar_styles": 0.1179,
+    "schedule_overlap": 0.1036,
+    "small_sample": 0.0714,
+    "neighbours": 0.125
+   }
+  ],
+  "decoy_top_template": [
+   {
+    "outcome": "FN",
+    "top_template": "none fits",
+    "len": 38,
+    "share": 0.413
+   },
+   {
+    "outcome": "FN",
+    "top_template": "losing_player",
+    "len": 13,
+    "share": 0.1413
+   },
+   {
+    "outcome": "FN",
+    "top_template": "small_sample",
+    "len": 11,
+    "share": 0.1196
+   },
+   {
+    "outcome": "FN",
+    "top_template": "neighbours",
+    "len": 8,
+    "share": 0.087
+   },
+   {
+    "outcome": "FN",
+    "top_template": "tilt",
+    "len": 7,
+    "share": 0.0761
+   },
+   {
+    "outcome": "FN",
+    "top_template": "schedule_overlap",
+    "len": 6,
+    "share": 0.0652
+   },
+   {
+    "outcome": "FN",
+    "top_template": "aggressive_player",
+    "len": 5,
+    "share": 0.0543
+   },
+   {
+    "outcome": "FN",
+    "top_template": "passive_player",
+    "len": 4,
+    "share": 0.0435
+   },
+   {
+    "outcome": "FP",
+    "top_template": "none fits",
+    "len": 34,
+    "share": 0.3696
+   },
+   {
+    "outcome": "FP",
+    "top_template": "neighbours",
+    "len": 13,
+    "share": 0.1413
+   },
+   {
+    "outcome": "FP",
+    "top_template": "losing_player",
+    "len": 12,
+    "share": 0.1304
+   },
+   {
+    "outcome": "FP",
+    "top_template": "schedule_overlap",
+    "len": 11,
+    "share": 0.1196
+   },
+   {
+    "outcome": "FP",
+    "top_template": "aggressive_player",
+    "len": 7,
+    "share": 0.0761
+   },
+   {
+    "outcome": "FP",
+    "top_template": "similar_styles",
+    "len": 6,
+    "share": 0.0652
+   },
+   {
+    "outcome": "FP",
+    "top_template": "small_sample",
+    "len": 5,
+    "share": 0.0543
+   },
+   {
+    "outcome": "FP",
+    "top_template": "tilt",
+    "len": 4,
+    "share": 0.0435
+   },
+   {
+    "outcome": "TN",
+    "top_template": "none fits",
+    "len": 49653,
+    "share": 0.4066
+   },
+   {
+    "outcome": "TN",
+    "top_template": "schedule_overlap",
+    "len": 10526,
+    "share": 0.0862
+   },
+   {
+    "outcome": "TN",
+    "top_template": "neighbours",
+    "len": 9448,
+    "share": 0.0774
+   },
+   {
+    "outcome": "TN",
+    "top_template": "tilt",
+    "len": 9406,
+    "share": 0.077
+   },
+   {
+    "outcome": "TN",
+    "top_template": "losing_player",
+    "len": 9380,
+    "share": 0.0768
+   },
+   {
+    "outcome": "TN",
+    "top_template": "similar_styles",
+    "len": 8999,
+    "share": 0.0737
+   },
+   {
+    "outcome": "TN",
+    "top_template": "passive_player",
+    "len": 8944,
+    "share": 0.0732
+   },
+   {
+    "outcome": "TN",
+    "top_template": "aggressive_player",
+    "len": 8366,
+    "share": 0.0685
+   },
+   {
+    "outcome": "TN",
+    "top_template": "small_sample",
+    "len": 7394,
+    "share": 0.0605
+   },
+   {
+    "outcome": "TP",
+    "top_template": "none fits",
+    "len": 107,
+    "share": 0.3821
+   },
+   {
+    "outcome": "TP",
+    "top_template": "losing_player",
+    "len": 42,
+    "share": 0.15
+   },
+   {
+    "outcome": "TP",
+    "top_template": "similar_styles",
+    "len": 28,
+    "share": 0.1
+   },
+   {
+    "outcome": "TP",
+    "top_template": "neighbours",
+    "len": 26,
+    "share": 0.0929
+   },
+   {
+    "outcome": "TP",
+    "top_template": "schedule_overlap",
+    "len": 22,
+    "share": 0.0786
+   },
+   {
+    "outcome": "TP",
+    "top_template": "aggressive_player",
+    "len": 21,
+    "share": 0.075
+   },
+   {
+    "outcome": "TP",
+    "top_template": "small_sample",
+    "len": 15,
+    "share": 0.0536
+   },
+   {
+    "outcome": "TP",
+    "top_template": "tilt",
+    "len": 13,
+    "share": 0.0464
+   },
+   {
+    "outcome": "TP",
+    "top_template": "passive_player",
+    "len": 6,
+    "share": 0.0214
+   }
+  ],
+  "missed_profile": [
+   {
+    "family": "directed_transfer",
+    "feature": "n_shared_frac",
+    "caught_median": 0.0425,
+    "missed_median": 0.03
+   },
+   {
+    "family": "directed_transfer",
+    "feature": "fold_lift_max",
+    "caught_median": -0.0685,
+    "missed_median": -0.0115
+   },
+   {
+    "family": "directed_transfer",
+    "feature": "ev_gift_lift_max",
+    "caught_median": 3.2482,
+    "missed_median": 0.7802
+   },
+   {
+    "family": "directed_transfer",
+    "feature": "pre_fold_ahead_lift_max",
+    "caught_median": -0.0024,
+    "missed_median": -0.0017
+   },
+   {
+    "family": "directed_transfer",
+    "feature": "netflow_bb100",
+    "caught_median": 395.0459,
+    "missed_median": 94.0033
+   },
+   {
+    "family": "soft_play",
+    "feature": "n_shared_frac",
+    "caught_median": 0.0377,
+    "missed_median": 0.0305
+   },
+   {
+    "family": "soft_play",
+    "feature": "hu_strong_check_lift",
+    "caught_median": 0.1185,
+    "missed_median": 0.0
+   },
+   {
+    "family": "soft_play",
+    "feature": "raise_lift_min",
+    "caught_median": -0.0306,
+    "missed_median": -0.0244
+   },
+   {
+    "family": "soft_play",
+    "feature": "fold_strong_lift_max",
+    "caught_median": -0.0046,
+    "missed_median": -0.0037
+   },
+   {
+    "family": "soft_play",
+    "feature": "hu_check_lift",
+    "caught_median": 0.116,
+    "missed_median": 0.0542
+   },
+   {
+    "family": "coordinated_isolation",
+    "feature": "n_shared_frac",
+    "caught_median": 0.0355,
+    "missed_median": 0.0415
+   },
+   {
+    "family": "coordinated_isolation",
+    "feature": "step_aside_lift_max",
+    "caught_median": 0.0095,
+    "missed_median": 0.0164
+   },
+   {
+    "family": "coordinated_isolation",
+    "feature": "vpip_pres_max",
+    "caught_median": 0.1031,
+    "missed_median": 0.0651
+   },
+   {
+    "family": "coordinated_isolation",
+    "feature": "iso_lift",
+    "caught_median": 0.0205,
+    "missed_median": 0.0248
+   },
+   {
+    "family": "coordinated_isolation",
+    "feature": "squeeze_lift_max",
+    "caught_median": 0.1101,
+    "missed_median": 0.0532
+   }
+  ],
+  "evidence_by_family": [
+   {
+    "behavior_family": "coordinated_isolation",
+    "pairs": 92,
+    "evidence_ap5": 0.1763,
+    "any_planted_in_top5": 0.8804,
+    "planted_per_pair": 5.0,
+    "median_candidates": 53.0
+   },
+   {
+    "behavior_family": "directed_transfer",
+    "pairs": 148,
+    "evidence_ap5": 0.5325,
+    "any_planted_in_top5": 0.9932,
+    "planted_per_pair": 4.8986,
+    "median_candidates": 49.0
+   },
+   {
+    "behavior_family": "soft_play",
+    "pairs": 132,
+    "evidence_ap5": 0.6007,
+    "any_planted_in_top5": 0.9924,
+    "planted_per_pair": 4.7879,
+    "median_candidates": 52.0
+   }
+  ],
+  "confusion": {
+   "view": "window",
+   "true": [
+    "directed_transfer",
+    "soft_play",
+    "coordinated_isolation"
+   ],
+   "predicted": [
+    "directed_transfer",
+    "soft_play",
+    "coordinated_isolation"
+   ],
+   "matrix": [
+    [
+     145,
+     0,
+     3
+    ],
+    [
+     0,
+     132,
+     0
+    ],
+    [
+     2,
+     1,
+     89
+    ]
+   ]
+  },
+  "pr_curves": {
+   "labeled": {
+    "recall": [
+     0.0,
+     0.01,
+     0.02,
+     0.03,
+     0.04,
+     0.05,
+     0.06,
+     0.07,
+     0.08,
+     0.09,
+     0.1,
+     0.11,
+     0.12,
+     0.13,
+     0.14,
+     0.15,
+     0.16,
+     0.17,
+     0.18,
+     0.19,
+     0.2,
+     0.21,
+     0.22,
+     0.23,
+     0.24,
+     0.25,
+     0.26,
+     0.27,
+     0.28,
+     0.29,
+     0.3,
+     0.31,
+     0.32,
+     0.33,
+     0.34,
+     0.35,
+     0.36,
+     0.37,
+     0.38,
+     0.39,
+     0.4,
+     0.41,
+     0.42,
+     0.43,
+     0.44,
+     0.45,
+     0.46,
+     0.47,
+     0.48,
+     0.49,
+     0.5,
+     0.51,
+     0.52,
+     0.53,
+     0.54,
+     0.55,
+     0.56,
+     0.57,
+     0.58,
+     0.59,
+     0.6,
+     0.61,
+     0.62,
+     0.63,
+     0.64,
+     0.65,
+     0.66,
+     0.67,
+     0.68,
+     0.69,
+     0.7,
+     0.71,
+     0.72,
+     0.73,
+     0.74,
+     0.75,
+     0.76,
+     0.77,
+     0.78,
+     0.79,
+     0.8,
+     0.81,
+     0.82,
+     0.83,
+     0.84,
+     0.85,
+     0.86,
+     0.87,
+     0.88,
+     0.89,
+     0.9,
+     0.91,
+     0.92,
+     0.93,
+     0.94,
+     0.95,
+     0.96,
+     0.97,
+     0.98,
+     0.99,
+     1.0
+    ],
+    "precision": [
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     1.0,
+     0.9944,
+     0.989,
+     0.9837,
+     0.9734,
+     0.961,
+     0.7949
+    ],
+    "base_rate": 0.2
+   },
+   "window": {
+    "recall": [
+     0.0,
+     0.01,
+     0.02,
+     0.03,
+     0.04,
+     0.05,
+     0.06,
+     0.07,
+     0.08,
+     0.09,
+     0.1,
+     0.11,
+     0.12,
+     0.13,
+     0.14,
+     0.15,
+     0.16,
+     0.17,
+     0.18,
+     0.19,
+     0.2,
+     0.21,
+     0.22,
+     0.23,
+     0.24,
+     0.25,
+     0.26,
+     0.27,
+     0.28,
+     0.29,
+     0.3,
+     0.31,
+     0.32,
+     0.33,
+     0.34,
+     0.35,
+     0.36,
+     0.37,
+     0.38,
+     0.39,
+     0.4,
+     0.41,
+     0.42,
+     0.43,
+     0.44,
+     0.45,
+     0.46,
+     0.47,
+     0.48,
+     0.49,
+     0.5,
+     0.51,
+     0.52,
+     0.53,
+     0.54,
+     0.55,
+     0.56,
+     0.57,
+     0.58,
+     0.59,
+     0.6,
+     0.61,
+     0.62,
+     0.63,
+     0.64,
+     0.65,
+     0.66,
+     0.67,
+     0.68,
+     0.69,
+     0.7,
+     0.71,
+     0.72,
+     0.73,
+     0.74,
+     0.75,
+     0.76,
+     0.77,
+     0.78,
+     0.79,
+     0.8,
+     0.81,
+     0.82,
+     0.83,
+     0.84,
+     0.85,
+     0.86,
+     0.87,
+     0.88,
+     0.89,
+     0.9,
+     0.91,
+     0.92,
+     0.93,
+     0.94,
+     0.95,
+     0.96,
+     0.97,
+     0.98,
+     0.99,
+     1.0
+    ],
+    "precision": [
+     1.0,
+     0.8889,
+     0.8889,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8235,
+     0.8211,
+     0.8211,
+     0.8211,
+     0.8211,
+     0.8211,
+     0.798,
+     0.7961,
+     0.7949,
+     0.7949,
+     0.7949,
+     0.7903,
+     0.7891,
+     0.787,
+     0.787,
+     0.787,
+     0.787,
+     0.787,
+     0.787,
+     0.787,
+     0.787,
+     0.7861,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7792,
+     0.7769,
+     0.7769,
+     0.7769,
+     0.7769,
+     0.7666,
+     0.7666,
+     0.7666,
+     0.7666,
+     0.7666,
+     0.7652,
+     0.7652,
+     0.7652,
+     0.7652,
+     0.7652,
+     0.7652,
+     0.7652,
+     0.7652,
+     0.7611,
+     0.7611,
+     0.7579,
+     0.7578,
+     0.7576,
+     0.7576,
+     0.7575,
+     0.754,
+     0.7527,
+     0.7493,
+     0.7405,
+     0.7393,
+     0.734,
+     0.7225,
+     0.7051,
+     0.6959,
+     0.6709,
+     0.6267,
+     0.6049,
+     0.5835,
+     0.5636,
+     0.5,
+     0.4172,
+     0.3906,
+     0.3046,
+     0.2778,
+     0.2472,
+     0.2337,
+     0.1392,
+     0.1306,
+     0.0661,
+     0.0243,
+     0.0086
+    ],
+    "base_rate": 0.00303
+   }
+  }
+ },
+ "explanations": {
+  "evidence_tags": {
+   "ev_gift": "Gave up {h_ev_gift_bb_max:.1f} bb of expected value against the partner",
+   "fold_ahead": "Folded the better hand to the partner's bet after the flop",
+   "pre_fold_ahead": "Folded a clearly stronger starting hand to the partner's raise",
+   "costly_fold": "Folded to the partner when calling was worth at least 1 bb",
+   "payoff": "Paid the partner off while behind ({h_payoff_bb_max:.1f} bb)",
+   "costly_call": "Called the partner when the call lost at least 1 bb",
+   "junk_call": "Called the partner's raise with a junk starting hand",
+   "strong_check": "Checked a strong hand (two pair or better) with the partner still in",
+   "open_step_aside": "One partner opened and the other folded behind them (isolation step)",
+   "squeeze": "Re-raised the partner's bet in a pot with other players in it",
+   "weak_open": "Opened with a bottom-half starting hand with the partner at the table",
+   "big_flow": "One of their largest chip transfers ({h_netflow_bb:.0f} bb)",
+   "big_pot": "One of the biggest pots they shared ({h_pot_bb:.0f} bb)",
+   "contested": "Both players were involved in this pot ({h_pot_bb:.0f} bb)"
+  },
+  "benign_templates": {
+   "passive_player": {
+    "title": "A passive player folds to everyone",
+    "trigger": "fold_rate_max",
+    "tail": "high"
+   },
+   "losing_player": {
+    "title": "A losing player loses to the whole table",
+    "trigger": "net_bb100_min",
+    "tail": "low"
+   },
+   "tilt": {
+    "title": "Tilt after big losses",
+    "trigger": "tilt_vpip_max",
+    "tail": "high"
+   },
+   "aggressive_player": {
+    "title": "A hyper-aggressive player",
+    "trigger": "af_max",
+    "tail": "high"
+   },
+   "similar_styles": {
+    "title": "Similar playing styles",
+    "trigger": "style_dist",
+    "tail": "low"
+   },
+   "schedule_overlap": {
+    "title": "They simply play together a lot",
+    "trigger": "n_shared_frac",
+    "tail": "high"
+   },
+   "small_sample": {
+    "title": "Too few hands to be sure",
+    "trigger": "n_shared_frac",
+    "tail": "low"
+   },
+   "neighbours": {
+    "title": "Seated side by side",
+    "trigger": "adjacent_rate",
+    "tail": "high"
+   }
+  }
+ }
+}
