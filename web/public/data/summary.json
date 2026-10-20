@@ -1,0 +1,260 @@
+{
+ "generated": "2026-10-20",
+ "code_version": "2864479",
+ "banner": "Simulated hands: every hand on this dashboard was played by our bots in the SimRoom. The detector was trained on the Kaggle competition 'Detect Suspicious Value Transfers in Poker' (Slash); no competition data is shown.",
+ "citation": "@misc{detect-suspicious-value-transfers-in-poker, author = {Slash — Detect Suspicious Value Transfers in Poker}, title = {Detect Suspicious Value Transfers in Poker}, year = {2026}, howpublished = {\\url{https://www.kaggle.com/competitions/detect-suspicious-value-transfers-in-poker}}, note = {Kaggle}}",
+ "simroom": {
+  "tables": 12,
+  "hands_per_table": 2500,
+  "bots_per_table": 30,
+  "hands": 30000,
+  "pairs_total": 5220,
+  "stakes": [
+   "1/2",
+   "2/4",
+   "5/10"
+  ]
+ },
+ "metrics": {
+  "population": "every SimRoom pair with at least 38 shared hands (the competition's evaluation filter)",
+  "pairs_scored": 3974,
+  "planted_scored": 34,
+  "planted_total": 37,
+  "decoys_scored": 29,
+  "base_rate": 0.0086,
+  "models": {
+   "M_full": {
+    "final": 0.4223,
+    "pair_ap": 0.3668,
+    "evidence_map": 0.6045,
+    "behavior_map": 0.447,
+    "behavior_ap": {
+     "directed_transfer": 0.9606,
+     "soft_play": 0.1193,
+     "coordinated_isolation": 0.261
+    }
+   },
+   "B0_shared_hands": {
+    "final": 0.04,
+    "pair_ap": 0.0184,
+    "evidence_map": 0.132,
+    "behavior_map": 0.0079,
+    "behavior_ap": {
+     "directed_transfer": 0.0108,
+     "soft_play": 0.0044,
+     "coordinated_isolation": 0.0086
+    }
+   },
+   "B1_net_flow": {
+    "final": 0.0863,
+    "pair_ap": 0.015,
+    "evidence_map": 0.3738,
+    "behavior_map": 0.0107,
+    "behavior_ap": {
+     "directed_transfer": 0.0192,
+     "soft_play": 0.0044,
+     "coordinated_isolation": 0.0086
+    }
+   }
+  },
+  "break_even": {
+   "k": 34,
+   "tp": 11,
+   "fp": 23,
+   "precision": 0.3235
+  },
+  "recall_by_family": [
+   {
+    "family": "coordinated_isolation",
+    "n": 12,
+    "caught": 0,
+    "median_rank": 431.0,
+    "behavior_correct": 0.8333
+   },
+   {
+    "family": "directed_transfer",
+    "n": 11,
+    "caught": 10,
+    "median_rank": 6.0,
+    "behavior_correct": 1.0
+   },
+   {
+    "family": "soft_play",
+    "n": 11,
+    "caught": 1,
+    "median_rank": 146.0,
+    "behavior_correct": 0.6364
+   }
+  ],
+  "decoys": [
+   {
+    "decoy": "passive_player",
+    "n": 6,
+    "best_rank": 135,
+    "median_rank": 972.0,
+    "in_top_k": 0
+   },
+   {
+    "decoy": "seated_together",
+    "n": 10,
+    "best_rank": 36,
+    "median_rank": 2250.5,
+    "in_top_k": 0
+   },
+   {
+    "decoy": "similar_styles",
+    "n": 6,
+    "best_rank": 113,
+    "median_rank": 2500.0,
+    "in_top_k": 0
+   },
+   {
+    "decoy": "tilt",
+    "n": 7,
+    "best_rank": 770,
+    "median_rank": 2561.0,
+    "in_top_k": 0
+   }
+  ],
+  "detection_by_coordinated_hands": [
+   {
+    "coordinated": "0-2",
+    "n": 6,
+    "caught": 0,
+    "median_rank": 1357.5
+   },
+   {
+    "coordinated": "10-19",
+    "n": 9,
+    "caught": 2,
+    "median_rank": 197.0
+   },
+   {
+    "coordinated": "20+",
+    "n": 8,
+    "caught": 6,
+    "median_rank": 6.5
+   },
+   {
+    "coordinated": "3-9",
+    "n": 11,
+    "caught": 3,
+    "median_rank": 93.0
+   }
+  ],
+  "families": [
+   "directed_transfer",
+   "soft_play",
+   "coordinated_isolation"
+  ]
+ },
+ "default_threshold": 0.0934,
+ "calibration": {
+  "ok": true,
+  "rows": [
+   {
+    "stat": "vpip",
+    "competition": "0.176 / 0.279 / 0.588",
+    "simroom": "0.141 / 0.271 / 0.55",
+    "ok": true
+   },
+   {
+    "stat": "pfr",
+    "competition": "0.11 / 0.167 / 0.261",
+    "simroom": "0.0725 / 0.177 / 0.333",
+    "ok": true
+   },
+   {
+    "stat": "af",
+    "competition": "1.28 / 2.18 / 4.29",
+    "simroom": "0.643 / 3.1 / 7.12",
+    "ok": true
+   },
+   {
+    "stat": "wtsd",
+    "competition": "0.174 / 0.263 / 0.358",
+    "simroom": "0.158 / 0.259 / 0.413",
+    "ok": true
+   },
+   {
+    "stat": "fold_rate",
+    "competition": "0.469 / 0.685 / 0.793",
+    "simroom": "0.501 / 0.689 / 0.819",
+    "ok": true
+   },
+   {
+    "stat": "call_rate",
+    "competition": "0.12 / 0.205 / 0.443",
+    "simroom": "0.103 / 0.194 / 0.453",
+    "ok": true
+   },
+   {
+    "stat": "raise_rate",
+    "competition": "0.0627 / 0.098 / 0.154",
+    "simroom": "0.0292 / 0.0995 / 0.189",
+    "ok": true
+   },
+   {
+    "stat": "bet_unopened",
+    "competition": "0.365 / 0.486 / 0.619",
+    "simroom": "0.233 / 0.603 / 0.828",
+    "ok": true
+   },
+   {
+    "stat": "net_bb100",
+    "competition": "-134 / 0.918 / 132",
+    "simroom": "-103 / 2.38 / 112",
+    "ok": true
+   },
+   {
+    "stat": "pot size (bb)",
+    "competition": "1.5 / 9.25 / 184",
+    "simroom": "1.5 / 11.5 / 162",
+    "ok": true
+   },
+   {
+    "stat": "saw_flop",
+    "competition": "0.528",
+    "simroom": "0.514",
+    "ok": true
+   },
+   {
+    "stat": "saw_river",
+    "competition": "0.209",
+    "simroom": "0.191",
+    "ok": true
+   },
+   {
+    "stat": "showdown",
+    "competition": "0.154",
+    "simroom": "0.153",
+    "ok": true
+   },
+   {
+    "stat": "preflop_fold_share",
+    "competition": "0.651",
+    "simroom": "0.672",
+    "ok": true
+   }
+  ]
+ },
+ "kaggle": {
+  "best_private": 0.8377,
+  "deployed": {
+   "n": 4,
+   "commit": "05f7db7",
+   "change": "Exact-odds decision equity and expected-value cost features",
+   "local_window_final": 0.651,
+   "public": 0.8311,
+   "private": 0.8358,
+   "deployed": true
+  }
+ },
+ "families": [
+  "directed_transfer",
+  "soft_play",
+  "coordinated_isolation"
+ ],
+ "detail_pairs": 144,
+ "replays": 1678
+}
