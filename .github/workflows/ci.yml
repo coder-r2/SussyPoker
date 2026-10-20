@@ -16,7 +16,10 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - name: Install
-        run: pip install -e ".[dev]"
+        run: pip install -e ".[dev,game]"
+      - name: Leak guard
+        # Competition IDs must never appear in the repo or the web export (SPEC C5)
+        run: python scripts/leak_scan.py
       - name: Lint
         run: ruff check .
       - name: Test

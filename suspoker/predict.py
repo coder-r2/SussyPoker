@@ -99,12 +99,17 @@ def build_submission(scored: pl.DataFrame, evidence: pl.DataFrame, order: pl.Ser
     return sub.select(SUBMISSION_COLUMNS).to_pandas()
 
 
-def hand_suspicion(meta: dict, directory: Path = MODELS_DIR) -> pl.DataFrame:
-    """hs_* features for evaluation pairs: score their candidate hands with H and summarize per pair."""
+def hand_probabilities(meta: dict, hands: pl.DataFrame, directory: Path = MODELS_DIR) -> np.ndarray:
+    """H's probability that each candidate hand is a planted one (DEC-024)."""
     h_models = [lgb.Booster(model_file=str(directory / f"h_suspicion_s{s}.txt")) for s in meta["seeds"]]
-    cols = meta["suspicion_hand_features"]
-    hands = pl.read_parquet(FEATURES_DIR / "hand_features.parquet").filter(pl.col("phase") == 1)
-    return aggregate(hands.select(*KEYS).with_columns(pl.Series("p", predict_hands(h_models, hands, cols))))
+    return predict_hands(h_models, hands, meta["suspicion_hand_features"])
+
+
+def hand_suspicion(meta: dict, directory: Path = MODELS_DIR, hands: pl.DataFrame | None = None) -> pl.DataFrame:
+    """hs_* features: score candidate hands with H and summarize per pair (default: evaluation pairs)."""
+    if hands is None:
+        hands = pl.read_parquet(FEATURES_DIR / "hand_features.parquet").filter(pl.col("phase") == 1)
+    return aggregate(hands.select(*KEYS).with_columns(pl.Series("p", hand_probabilities(meta, hands, directory))))
 
 
 def evaluation_pairs(models: Models) -> pl.DataFrame:

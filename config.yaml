@@ -37,3 +37,12 @@ behavior_policy:
     novelty_percentile: 99
     max_family_prob: 0.5
     min_risk_quantile: 0.5
+
+simroom:                        # simulated card room for the dashboard (SPEC §7.8)
+  seed: 7
+  tables: 12
+  hands: 2500
+  pool: 30
+  pairs: [2, 4]                 # planted colluding pairs per table
+  decoys: [2, 3]                # planted decoy pairs per table
+  intensity: [0.35, 0.85]       # share of eligible hands in which an active pair coordinates
