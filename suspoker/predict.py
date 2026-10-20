@@ -22,7 +22,7 @@ from suspoker.config import ARTIFACTS_DIR, MODELS_DIR, RAW_DIR
 from suspoker.metric import EVIDENCE_COLUMNS, NO_EVIDENCE, SUBMISSION_COLUMNS
 from suspoker.modeling import KEYS, cross_features, hand_context, keyed, matrix, with_exposure
 from suspoker.pipeline import FEATURES_DIR
-from suspoker.suspicion import aggregate, predict_hands
+from suspoker.suspicion import pair_suspicion, predict_hands
 from suspoker.train import FAMILY_PROBS, assign_behavior, calibrate, novelty_percentile, top5
 
 EVIDENCE_CHUNKS = 8  # evaluation hands are scored in pair chunks to bound memory (3.6M candidate hands)
@@ -109,7 +109,8 @@ def hand_suspicion(meta: dict, directory: Path = MODELS_DIR, hands: pl.DataFrame
     """hs_* features: score candidate hands with H and summarize per pair (default: evaluation pairs)."""
     if hands is None:
         hands = pl.read_parquet(FEATURES_DIR / "hand_features.parquet").filter(pl.col("phase") == 1)
-    return aggregate(hands.select(*KEYS).with_columns(pl.Series("p", hand_probabilities(meta, hands, directory))))
+    scored = hands.select(*KEYS).with_columns(pl.Series("p", hand_probabilities(meta, hands, directory)))
+    return pair_suspicion(scored, rel=bool(meta.get("hs_relative")))
 
 
 def evaluation_pairs(models: Models) -> pl.DataFrame:

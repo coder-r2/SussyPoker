@@ -43,7 +43,7 @@ from suspoker.modeling import (
     predict_proba,
 )
 from suspoker.pipeline import DEV_HANDS_DIR, FEATURES_DIR, WINDOW_HANDS
-from suspoker.suspicion import HS_FEATURES, attach, fit_hand_models, labeled_hands, oof_suspicion
+from suspoker.suspicion import HS_FEATURES, HS_REL_FEATURES, attach, fit_hand_models, labeled_hands, oof_suspicion
 
 OOF_DIR = ARTIFACTS_DIR / "oof"
 N_UNLABELED = 5000          # unlabeled development pairs added as negatives per view and M1 fit
@@ -281,6 +281,7 @@ def fit_final(d: DevData, hf: pl.DataFrame, probs_oof: pl.DataFrame, calib: dict
         pickle.dump(m3, fh)
     meta = {"pair_features": FEATURES, "cross_period": any(f.startswith("x_") for f in FEATURES),
             "hand_suspicion": bool(hs_cols), "suspicion_hand_features": hs_cols,
+            "hs_relative": any(f in FEATURES for f in HS_REL_FEATURES),
             "hand_features": hfeats, "novelty_features": NOVELTY_FEATURES,
             "families": list(FAMILIES), "seeds": list(SEEDS), "calibration": calib, "none_below_raw": none_below,
             "behavior_policy": cfg["behavior_policy"], "n_unlabeled_negatives_per_view": N_UNLABELED,
@@ -314,8 +315,10 @@ def configure(cfg: dict) -> bool:
     """Set the M1/M2 feature list from config; returns whether cross-period features are on."""
     global FEATURES
     cross = option(cfg, "cross_period")
+    hs, rel = option(cfg, "hand_suspicion"), option(cfg, "hs_relative")
     FEATURES = (PAIR_FEATURES + (CROSS_FEATURES if cross else [])
-                + (HS_FEATURES if option(cfg, "hand_suspicion") else []))
+                + (HS_FEATURES if hs and rel != "replace" else [])
+                + (["hs_top3_rel"] if hs and rel == "top3" else HS_REL_FEATURES if hs and rel else []))
     return cross
 
 
@@ -332,7 +335,7 @@ def load_all(cfg: dict, seed: int | None = None) -> tuple[DevData, pl.DataFrame]
     d = load_dev(pf, pl.read_parquet(FEATURES_DIR / "pair_features_windows.parquet"), seed=seed,
                  cross=pf.filter(pl.col("phase") == 1) if cross else None)
     if option(cfg, "hand_suspicion"):
-        d = attach(d, oof_suspicion(d, dev_hand_parts(), SEEDS))
+        d = attach(d, oof_suspicion(d, dev_hand_parts(), SEEDS, rel=bool(option(cfg, "hs_relative"))))
     return d, hf
 
 
@@ -508,7 +511,9 @@ if __name__ == "__main__":
         try:
             OVERRIDES[key.removeprefix("model.")] = float(val)
         except ValueError:
-            OVERRIDES[key.removeprefix("model.")] = val.lower() in ("1", "true", "yes")
+            low = val.lower()
+            OVERRIDES[key.removeprefix("model.")] = (low in ("true", "yes") if low in ("true", "yes", "false", "no")
+                                                     else val)  # words like "add" stay strings
     if args.repeats:
         repeat_cv(args.tag, [int(x) for x in args.repeats.split(",")])
     else:

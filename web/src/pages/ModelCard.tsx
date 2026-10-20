@@ -386,6 +386,11 @@ function Limits() {
         <li><strong>False positives have a cost.</strong> Even at the break-even cut a quarter of flagged pairs are not
           known colluders. A flag is a reason to review hands, never proof; the innocent-explanation panel exists to push
           against confirmation bias.</li>
+        <li><strong>Style combinations can look like collusion.</strong> In the SimRoom, 22 of the 23 false alarms at
+          the break-even cut involve a calling station, and 11 are two calling stations together: two very passive
+          players check strong hands down and pay each other off, which is what planted soft-play hands look like.
+          The hand-suspicion features judge hands one at a time, so they cannot tell this apart; comparing with each
+          player's other opponents did not fix it, because the pattern only appears for the combination.</li>
         <li><strong>The auditor sees all cards.</strong> Features use every player's hole cards, which a real site has but
           players do not. The model judges decisions with information the players could not see, by design.</li>
         <li><strong>Not a production fraud tool.</strong> A portfolio project: no appeal process, no monitoring for drift,

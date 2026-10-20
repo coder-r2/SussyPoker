@@ -22,7 +22,7 @@ from suspoker.interactions import enrich_actions, hand_context, hand_players, re
 from suspoker.modeling import EVAL_MIN_SHARED, KEYS, with_exposure
 from suspoker.pipeline import with_string_ids
 from suspoker.predict import Models, hand_probabilities, score_evidence, score_pairs
-from suspoker.suspicion import aggregate
+from suspoker.suspicion import pair_suspicion
 
 
 @dataclass
@@ -85,7 +85,8 @@ def score_tables(hands: pl.DataFrame, seats: pl.DataFrame, actions: pl.DataFrame
     meta = models.meta
     hf = hf.with_columns(pl.Series("p", hand_probabilities(meta, hf)))
     if meta.get("hand_suspicion"):
-        pairs = pairs.join(aggregate(hf.select(*KEYS, "p")), on=KEYS, how="left")
+        pairs = pairs.join(pair_suspicion(hf.select(*KEYS, "p"), rel=bool(meta.get("hs_relative"))), on=KEYS,
+                           how="left")
     pairs = pairs.sort("table_id", "pair_id")
 
     scored = score_pairs(models, pairs)

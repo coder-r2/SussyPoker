@@ -16,7 +16,7 @@ from suspoker.explain import (
 )
 from suspoker.export_web import LeakError, leak_check, write_json
 from suspoker.modeling import CROSS_FEATURES, PAIR_FEATURES
-from suspoker.suspicion import HS_FEATURES
+from suspoker.suspicion import HS_FEATURES, HS_REL_FEATURES
 
 
 def _toy_model(objective: str = "binary", n_class: int = 1):
@@ -57,7 +57,7 @@ def test_reasons_split_for_and_against_with_labels():
 
 
 def test_every_model_input_has_a_plain_english_label():
-    for f in [*PAIR_FEATURES, *HS_FEATURES, *CROSS_FEATURES]:
+    for f in [*PAIR_FEATURES, *HS_FEATURES, *HS_REL_FEATURES, *CROSS_FEATURES]:
         fam, label = feature_info(f)
         assert fam != "other" and label != f, f
 
@@ -117,3 +117,18 @@ def test_break_even_cut_counts_and_pr_curve():
     curve = pr_curve(p["label"].to_numpy(), p["risk_window"].to_numpy(), points=11)
     assert curve["precision"][0] == 1.0 and curve["precision"][-1] == 0.6  # 3 colluders in the top 5
     assert all(a >= b for a, b in zip(curve["precision"], curve["precision"][1:], strict=False))
+
+
+def test_relative_hand_suspicion_compares_with_each_players_other_pairs():
+    from suspoker.suspicion import relative
+
+    # player "s" (a calling station) looks suspicious with everyone; pair (a, b) is suspicious only together
+    hs = pl.DataFrame({"player_lo": ["a", "a", "b", "c", "c", "c"], "player_hi": ["b", "x", "y", "s", "t", "u"],
+                       "hs_max": [0.9, 0.1, 0.1, 0.9, 0.1, 0.1], "hs_top3": [0.8, 0.1, 0.1, 0.8, 0.1, 0.1],
+                       "hs_top5": 0.0, "hs_n50": 0.0, "hs_frac": 0.0})
+    hs = pl.concat([hs, pl.DataFrame({"player_lo": ["s", "s"], "player_hi": ["v", "w"], "hs_max": [0.9, 0.9],
+                                      "hs_top3": [0.8, 0.8], "hs_top5": 0.0, "hs_n50": 0.0, "hs_frac": 0.0})])
+    r = {(a, b): x for a, b, x in relative(hs).select("player_lo", "player_hi", "hs_top3_rel").iter_rows()}
+    assert r[("a", "b")] == pytest.approx(0.7)       # 0.8 vs a baseline of 0.1 for both players
+    assert r[("c", "s")] == pytest.approx(0.0)       # 0.8 vs s's other pairs, which are all 0.8
+    assert relative(hs)["hs_base_max"].null_count() == 0

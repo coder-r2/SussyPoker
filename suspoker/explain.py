@@ -39,6 +39,9 @@ EXTRA_LABELS: dict[str, tuple[str, str]] = {
     "hs_top5": ("F9 hand suspicion", "Average suspicion of their 5 most suspicious shared hands"),
     "hs_n50": ("F9 hand suspicion", "Number of shared hands that look more planted than not"),
     "hs_frac": ("F9 hand suspicion", "Share of their contested hands that look more planted than not"),
+    "hs_max_rel": ("F9 hand suspicion", "Their most suspicious hand vs each player's other pairs (lift)"),
+    "hs_top3_rel": ("F9 hand suspicion", "Their 3 most suspicious hands vs each player's other pairs (lift)"),
+    "hs_base_max": ("F9 hand suspicion", "How suspicious the more suspicious player's hands look with everyone else"),
 }
 
 
