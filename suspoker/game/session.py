@@ -268,16 +268,15 @@ class Session:
         w = self._world
         ev = w.evidence.filter(pl.col("pair_id") == mine["pair_id"]).sort("rank")
         benign = w.pairs.filter(pl.col("pair_id") == mine["pair_id"])["benign"].to_list()[0]
+        ranks = f"your pair ranks #{mine['rank']} of {len(d.pairs)}"
         if mine["rank"] == 1 and mine["flagged"]:
             verdict, headline = "caught", "Caught: you are the detector's #1 pair and above the review threshold."
         elif mine["flagged"] or (mine["watched"] and mine["rank"] <= 3):
-            verdict, headline = "suspected", (f"Suspected: your pair ranks #{mine['rank']} of {len(d.pairs)} and is above "
-                                              "the warning line.")
+            verdict, headline = "suspected", f"Suspected: {ranks} and is above the warning line."
         elif self.strategy == "honest":
-            verdict, headline = "clear", f"Cleared: your pair ranks #{mine['rank']} of {len(d.pairs)}, below the warning line."
+            verdict, headline = "clear", f"Cleared: {ranks}, below the warning line."
         else:
-            verdict, headline = "clear", (f"You got away with it: your pair ranks #{mine['rank']} of {len(d.pairs)}, below "
-                                          "the warning line.")
+            verdict, headline = "clear", f"You got away with it: {ranks}, below the warning line."
         coordinated = set(self.coordinated)
         return {"verdict": verdict, "headline": headline, "hands": self.hands_played, "you": mine,
                 "evidence": [{"rank": r["rank"], "hand_id": r["hand_id"], "score": r["score"], "tags": r["tags"],
