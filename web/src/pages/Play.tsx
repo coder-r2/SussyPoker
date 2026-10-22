@@ -160,6 +160,7 @@ export function Play() {
     skip.current = false;
     const r = await api.act(state.session_id, action, amount);
     await animate(r.events ?? [], r.state, r.detector, viewFromState(state));
+    if (r.hand_complete && !r.detector) setDetector(await api.detector(state.session_id)); // scored while we animated
   });
 
   /** Auto-play one hand at a time and watch each at table pace; "Finish instantly" plays the rest without animation. */
@@ -175,6 +176,7 @@ export function Play() {
         skip.current = false;
         const r = await api.autoplay(s.session_id, 1, mode, true);
         await animate(r.events ?? [], r.state, r.detector, viewFromState(s), true);
+        if (!r.detector) setDetector(await api.detector(s.session_id));
         done += Math.max(1, r.state.hands_played - before);
         s = r.state;
         setAuto((a) => a && { ...a, done });
@@ -188,7 +190,7 @@ export function Play() {
         done += step;
         s = r.state;
         setState(r.state);
-        setDetector(r.detector);
+        if (r.detector) setDetector(r.detector);
       }
     } finally {
       setAuto(null);

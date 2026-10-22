@@ -10,7 +10,7 @@ import os
 import subprocess
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -33,6 +33,8 @@ STORE = SessionStore(MODELS, cap=int(os.environ.get("SUSPOKER_MAX_SESSIONS", 25)
 def _git_sha() -> str:
     if os.environ.get("GIT_SHA"):
         return os.environ["GIT_SHA"]
+    if os.environ.get("RENDER_GIT_COMMIT"):  # set by Render at runtime
+        return os.environ["RENDER_GIT_COMMIT"][:7]
     try:
         return subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True,
                               check=True).stdout.strip()
@@ -59,6 +61,15 @@ class Autoplay(BaseModel):
     hands: int = Field(..., ge=1, le=50)
     user_mode: Literal["colluding", "honest"] = "colluding"
     animate: bool = False  # return step-by-step events (meant for one hand at a time)
+
+
+def _score_later(s, tasks: BackgroundTasks) -> None:
+    """Rescore after the response is sent: the player watches the hand play out (10+ s) while the detector catches
+    up, which hides the scoring time on a small free server. /detector waits for it (same lock)."""
+    def run() -> None:
+        with s.lock:
+            s.ensure_scored()
+    tasks.add_task(run)
 
 
 def _session(sid: str):
@@ -93,25 +104,32 @@ def get_state(sid: str) -> dict:
 
 
 @app.post("/api/sessions/{sid}/action")
-def act(sid: str, req: Action) -> dict:
+def act(sid: str, req: Action, tasks: BackgroundTasks) -> dict:
+    """Your move and the bots' replies. When a hand finishes, `detector` is null and the rescore runs in the
+    background: fetch /detector after showing the moves."""
     s = _session(sid)
     with s.lock:
         try:
-            done = s.act(req.action, req.amount)
+            done = s.act(req.action, req.amount, rescore=False)
         except ValueError as e:
             raise HTTPException(409, str(e)) from None
-        return {"state": s.state(), "hand_complete": done, "detector": s.detector_json() if done else None,
-                "events": s.take_events()}
+        if done:
+            _score_later(s, tasks)
+        return {"state": s.state(), "hand_complete": done, "detector": None, "events": s.take_events()}
 
 
 @app.post("/api/sessions/{sid}/autoplay")
-def autoplay(sid: str, req: Autoplay) -> dict:
+def autoplay(sid: str, req: Autoplay, tasks: BackgroundTasks) -> dict:
+    """Auto-play hands. With `animate`, `detector` is null and scoring runs in the background (as for /action)."""
     s = _session(sid)
     with s.lock:
         if s.finished:
             raise HTTPException(409, f"The session is over ({MAX_HANDS} hands)")
-        s.autoplay(min(req.hands, MAX_HANDS - s.hands_played), req.user_mode, req.animate)
-        return {"state": s.state(), "detector": s.detector_json(), "events": s.take_events()}
+        s.autoplay(min(req.hands, MAX_HANDS - s.hands_played), req.user_mode, req.animate, rescore=not req.animate)
+        if req.animate:
+            _score_later(s, tasks)
+        return {"state": s.state(), "detector": None if req.animate else s.detector_json(),
+                "events": s.take_events()}
 
 
 @app.get("/api/sessions/{sid}/detector")

@@ -1,12 +1,13 @@
 name: Pages
 
 # Builds the static site (web/) and deploys it to GitHub Pages: https://coder-r2.github.io/SussyPoker/
-# Manual only until the final release (owner's choice): the automatic trigger below is restored in P9, after
-# Pages is enabled (Settings -> Pages -> Source: GitHub Actions). CI still type-checks and builds web/ on every push.
+# Needs Pages enabled once (Settings -> Pages -> Source: GitHub Actions). The game server URL comes from the
+# repository variable API_BASE (Settings -> Secrets and variables -> Actions -> Variables), defaulting to the
+# Render service in render.yaml.
 on:
-  # push:
-  #   branches: [main]
-  #   paths: ["web/**", ".github/workflows/pages.yml"]
+  push:
+    branches: [main]
+    paths: ["web/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:
@@ -35,6 +36,8 @@ jobs:
         run: npm ci
       - name: Type-check and build
         run: npm run build
+        env:
+          VITE_API_BASE: ${{ vars.API_BASE || 'https://suspoker-api.onrender.com' }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

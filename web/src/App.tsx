@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect } from "react";
 import { HashRouter, Link, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { api } from "./api";
 import { Status } from "./components/ui";
 import { Alerts } from "./pages/Alerts";
 import { Hand } from "./pages/Hand";
@@ -30,12 +31,22 @@ function Title() {
   return null;
 }
 
+// The free game server sleeps when idle and takes ~1 min to wake: knock on the door as soon as anyone visits, so it
+// is usually up by the time they open the game.
+function WakeServer() {
+  useEffect(() => {
+    api.health().catch(() => { /* still waking; the play page keeps retrying */ });
+  }, []);
+  return null;
+}
+
 // Hash routing (/#/...) so GitHub Pages serves every route from one index.html.
 export function App() {
   return (
     <HashRouter>
       <ScrollToTop />
       <Title />
+      <WakeServer />
       <Layout>
         <Suspense fallback={<Status />}>
           <Routes>

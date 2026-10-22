@@ -1,0 +1,30 @@
+# Render Blueprint for the Beat the Detector API (free web service, Docker). Create it once from the Render
+# dashboard: New -> Blueprint -> pick this repository. Later pushes that touch the API redeploy it automatically.
+# Free instances: 512 MB RAM, 0.1 CPU, asleep after 15 idle minutes (the play page shows a wake-up screen).
+services:
+  - type: web
+    name: suspoker-api
+    runtime: docker
+    plan: free
+    region: oregon
+    branch: main
+    dockerfilePath: ./api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    buildFilter:
+      paths:
+        - api/**
+        - suspoker/**
+        - models/**
+        - pyproject.toml
+        - config.yaml
+    envVars:
+      # one game at a time uses ~230 MB plus ~10-60 MB per session; keep well under 512 MB
+      - key: SUSPOKER_MAX_SESSIONS
+        value: "5"
+      # a 0.1 CPU share gains nothing from extra threads
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: POLARS_MAX_THREADS
+        value: "1"

@@ -179,8 +179,9 @@ class Session:
         self.hand = None
 
     # ----------------------------------------------------------------------------------------------- user API
-    def act(self, action: str, amount: int | None = None) -> bool:
-        """Apply the user's action; returns whether at least one hand finished."""
+    def act(self, action: str, amount: int | None = None, rescore: bool = True) -> bool:
+        """Apply the user's action; returns whether at least one hand finished. With `rescore=False` the detector is
+        brought up to date later (`ensure_scored`), so the moves can go back to the player first."""
         if self.hand is None:
             raise ValueError("the session is over")
         v = self.hand.view()
@@ -190,11 +191,11 @@ class Session:
         self.events = []
         self._emit("action", self.hand.act(_user_decision(v, action, amount)))
         self._run_bots()
-        if self.hands_played > before:
+        if self.hands_played > before and rescore:
             self.rescore()
         return self.hands_played > before
 
-    def autoplay(self, hands: int, user_mode: str, animate: bool = False) -> None:
+    def autoplay(self, hands: int, user_mode: str, animate: bool = False, rescore: bool = True) -> None:
         """Play `hands` hands with the user's seat run by bot logic ('colluding' or 'honest'). With `animate`, record
         every step so the front end can play the hands out at table pace."""
         if user_mode not in ("colluding", "honest"):
@@ -213,11 +214,16 @@ class Session:
         if self.hand is None:
             self._deal()
             self._run_bots()
-        self.rescore()
+        if rescore:
+            self.rescore()
 
     # ----------------------------------------------------------------------------------------------- scoring
     def frames(self) -> tuple[pl.DataFrame, pl.DataFrame, pl.DataFrame]:
         return self.log.frames()
+
+    def ensure_scored(self) -> Detector:
+        """Rescore only if hands were played since the last scoring."""
+        return self.detector if self.detector.hands == self.hands_played else self.rescore()
 
     def rescore(self) -> Detector:
         n = self.hands_played
@@ -375,7 +381,7 @@ class Session:
             "seats": seats, "to_act": 0 if legal else None, "legal": legal, "last_hand": self.last_hand}
 
     def detector_json(self) -> dict:
-        d = self.detector
+        d = self.ensure_scored()
         return {"status": d.status, "hands": d.hands, "needed": MIN_SHARED, "threshold": REVIEW_THRESHOLD,
                 "watch": WATCH_THRESHOLD, "pairs": d.pairs, "you_rank": d.you_rank}
 

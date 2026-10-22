@@ -111,3 +111,20 @@ def test_top3_rank_alone_is_not_suspicious():
     assert report["verdict"] == "clear" and report["headline"].startswith("Cleared")
     mine |= {"risk": 0.02, "watched": True}
     assert client.get(f"/api/sessions/{sid}/report").json()["verdict"] == "suspected"
+
+
+def test_hand_end_scores_in_background_then_detector_is_current():
+    sid = client.post("/api/sessions", json={"strategy": "soft_play"}).json()["session_id"]
+    client.post(f"/api/sessions/{sid}/autoplay", json={"hands": 40})
+    played = STORE.get(sid).hands_played
+    for _ in range(60):  # play on until a hand finishes
+        legal = client.get(f"/api/sessions/{sid}").json()["state"]["legal"]
+        r = client.post(f"/api/sessions/{sid}/action", json={"action": "fold" if legal["fold"] else "check"}).json()
+        if r["hand_complete"]:
+            break
+    assert r["hand_complete"] and r["detector"] is None  # moves first, scores later
+    det = client.get(f"/api/sessions/{sid}/detector").json()
+    assert det["status"] == "scored" and det["hands"] == r["state"]["hands_played"] > played
+    r = client.post(f"/api/sessions/{sid}/autoplay", json={"hands": 1, "animate": True}).json()
+    assert r["detector"] is None
+    assert client.get(f"/api/sessions/{sid}/detector").json()["hands"] == r["state"]["hands_played"]

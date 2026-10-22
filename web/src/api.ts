@@ -1,8 +1,8 @@
 import type { DetectorState, Direction, GameEvent, GameReport, GameState, HandReplay, Highlight, Strategy } from "./types";
 
-// Game API (FastAPI). Locally: `uvicorn api.main:app --port 8000`. In production the Hugging Face Space URL is set
-// at build time with VITE_API_BASE.
-export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
+// Game API (FastAPI). Locally: `uvicorn api.main:app --port 8000`. In production the Render service URL is set at
+// build time with VITE_API_BASE (see .github/workflows/pages.yml).
+export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) || "http://localhost:8000";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -37,7 +37,7 @@ export const api = {
     call<{ state: GameState; hand_complete: boolean; detector: DetectorState | null; events: GameEvent[] }>(`/api/sessions/${id}/action`,
       { action, amount }),
   autoplay: (id: string, hands: number, user_mode: "colluding" | "honest", animate = false) =>
-    call<{ state: GameState; detector: DetectorState; events: GameEvent[] }>(`/api/sessions/${id}/autoplay`,
+    call<{ state: GameState; detector: DetectorState | null; events: GameEvent[] }>(`/api/sessions/${id}/autoplay`,
       { hands, user_mode, animate }),
   detector: (id: string) => call<DetectorState>(`/api/sessions/${id}/detector`),
   report: (id: string) => call<GameReport>(`/api/sessions/${id}/report`),

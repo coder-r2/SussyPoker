@@ -1,6 +1,6 @@
 """Performance check of the game API against SPEC §7.9 targets (run against a live server).
 
-    uvicorn api.main:app --port 8000      # ideally limited to 2 CPUs, like a Hugging Face CPU Basic Space
+    uvicorn api.main:app --port 8000      # the live server is a Render free instance (0.1 CPU)
     python scripts/perf_api.py [--base http://localhost:8000]
 
 Targets: one action incl. bot responses p95 < 300 ms; detector rescoring after a hand (15 pairs, <= 500 hands)
