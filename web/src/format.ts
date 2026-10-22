@@ -58,6 +58,9 @@ export const fmt = {
   num: (x: number, d = 3) => (Number.isFinite(x) ? x.toFixed(d) : "–"),
   int: (x: number) => x.toLocaleString("en-US"),
   risk: (x: number) => (x >= 0.01 ? x.toFixed(3) : x.toExponential(1)),
+  /** Risk as a chance in plain words, for the game: 0.0005 -> "0.05%". */
+  chance: (x: number) => (x < 0.0001 ? "<0.01%" : x < 0.01 ? `${(x * 100).toFixed(2)}%` : x < 0.1 ? `${(x * 100).toFixed(1)}%`
+    : `${Math.round(x * 100)}%`),
   signed: (x: number, d = 2) => `${x >= 0 ? "+" : "−"}${Math.abs(x).toFixed(d)}`,
   bb: (x: number) => `${x.toFixed(x >= 10 || x <= -10 ? 0 : 1)} bb`,
 };

@@ -420,15 +420,19 @@ function Controls({ state, disabled, onAct }: { state: GameState; disabled: bool
   );
 }
 
-function SuspicionMeter({ risk, threshold }: { risk: number; threshold: number }) {
+function SuspicionMeter({ risk, threshold, watch }: { risk: number; threshold: number; watch: number }) {
   const pos = (v: number) => Math.min(100, Math.max(0, ((Math.log10(Math.max(v, 1e-4)) + 4) / 4) * 100)); // log scale
   return (
     <div style={{ margin: "10px 0 4px" }}>
-      <div className="meter" title={`suspicion ${risk.toFixed(4)}; investigation line ${threshold}`}>
+      <div className="row small" style={{ justifyContent: "space-between", marginBottom: 6 }}>
+        <span className="muted">Chance you're cheating, says the detector</span><strong className="num">{fmt.chance(risk)}</strong></div>
+      <div className="meter" title={`warning line ${fmt.chance(watch)} · investigation line ${fmt.chance(threshold)}`}>
+        <span className="mark" style={{ left: `${pos(watch)}%` }} />
         <span className="mark" style={{ left: `${pos(threshold)}%` }} />
         <span className="needle" style={{ left: `${pos(risk)}%` }} />
       </div>
-      <div className="row small muted" style={{ justifyContent: "space-between", marginTop: 4 }}><span>😇 innocent</span><span>🚨 guilty</span></div>
+      <div className="row small muted" style={{ justifyContent: "space-between", marginTop: 4 }}><span>😇 innocent</span>
+        <span>👀 {fmt.chance(watch)} warning · 🚩 {fmt.chance(threshold)} investigate</span></div>
     </div>
   );
 }
@@ -450,7 +454,8 @@ function DetectorPanel({ detector }: { detector: DetectorState | null }) {
   }
   const you = detector.pairs.find((p) => p.you_and_partner)!;
   const status = you.rank === 1 && you.flagged ? { t: "🚨 Under investigation!", c: "var(--critical)" }
-    : you.flagged || you.rank <= 3 ? { t: "👀 Getting noticed…", c: "#d97706" } : { t: "😎 Flying under the radar", c: "var(--good-text)" };
+    : you.flagged || (you.watched && you.rank <= 3) ? { t: "👀 Getting noticed…", c: "#d97706" }
+    : { t: "😎 Flying under the radar", c: "var(--good-text)" };
   const medal = you.rank === 1 ? "🥇" : you.rank === 2 ? "🥈" : you.rank === 3 ? "🥉" : "";
   return (
     <div className="card">
@@ -461,12 +466,12 @@ function DetectorPanel({ detector }: { detector: DetectorState | null }) {
         <span className="stat-hero" style={{ fontSize: "2.6rem" }} key={you.rank}>{medal}#{you.rank}</span>
         <span className="muted">most suspicious of {detector.pairs.length} pairs</span>
       </div>
-      <SuspicionMeter risk={you.risk} threshold={detector.threshold} />
-      <div className="row small" style={{ marginTop: 8 }}><span className="muted">It thinks you're doing:</span>
+      <SuspicionMeter risk={you.risk} threshold={detector.threshold} watch={detector.watch} />
+      <div className="row small" style={{ marginTop: 8 }}><span className="muted">{you.watched ? "It thinks you're doing:" : "If you are cheating, its best guess:"}</span>
         <FamilyChip family={you.behavior} prob={you.probs[you.behavior as keyof typeof you.probs]} /></div>
       {you.drivers.length > 0 && (
         <>
-          <div className="small muted" style={{ marginTop: 10 }}>What gives you away</div>
+          <div className="small muted" style={{ marginTop: 10 }}>{you.watched ? "What gives you away" : "What it's keeping an eye on"}</div>
           <ol className="small" style={{ margin: "4px 0 0", paddingLeft: 18 }}>{you.drivers.map((d) => <li key={d.label}>{d.label}</li>)}</ol>
         </>
       )}
@@ -478,7 +483,7 @@ function DetectorPanel({ detector }: { detector: DetectorState | null }) {
               <span className="num" style={{ width: 26, fontWeight: 700 }}>{p.rank === 1 ? "🥇" : p.rank === 2 ? "🥈" : p.rank === 3 ? "🥉" : `#${p.rank}`}</span>
               {p.players.map((x) => <span key={x.seat} className="avatar sm" title={x.is_you ? "You" : prettyName(x.name)}>{x.is_you ? "😎" : avatar(x.name)}</span>)}
               <span className="small" style={{ flex: 1 }}>{p.players.map((x) => (x.is_you ? "You" : prettyName(x.name))).join(" & ")}</span>
-              <span className="small num">{fmt.risk(p.risk)}</span>
+              <span className="small num">{fmt.chance(p.risk)}</span>
               {p.flagged && <span title="above the investigation line">🚩</span>}
             </li>
           ))}
@@ -492,7 +497,8 @@ function DetectorPanel({ detector }: { detector: DetectorState | null }) {
 // ------------------------------------------------------------------ report
 function ReportView({ report, state, onOpenHand, onRestart }: { report: GameReport; state: GameState;
   onOpenHand: (h: string) => void; onRestart: () => void }) {
-  const stamp = { caught: "CAUGHT!", suspected: "SUSPECTED", clear: "GOT AWAY", insufficient: "TOO SOON" }[report.verdict];
+  const stamp = { caught: "CAUGHT!", suspected: "SUSPECTED", clear: state.strategy === "honest" ? "CLEARED" : "GOT AWAY",
+    insufficient: "TOO SOON" }[report.verdict];
   const cls = report.verdict === "clear" ? "clear" : report.verdict === "caught" ? "caught" : "suspected";
   const strat = STRATEGIES.find((s) => s.id === state.strategy)!;
   return (
@@ -502,7 +508,7 @@ function ReportView({ report, state, onOpenHand, onRestart }: { report: GameRepo
         <h2 style={{ marginTop: 18 }}>{report.headline}</h2>
         <p className="muted" style={{ marginBottom: 0 }}>{report.hands} hands · {strat.emoji} {strat.title}
           {state.strategy !== "honest" && <> · cheating {fmt.pct(state.intensity, 0)} of the time</>}
-          {report.you && <> · suspicion {fmt.risk(report.you.risk)} · guessed {FAMILY_EMOJI[report.you.behavior]}</>}</p>
+          {report.you && <> · chance of cheating {fmt.chance(report.you.risk)} · guessed {FAMILY_EMOJI[report.you.behavior]}</>}</p>
       </div>
       {report.evidence.length > 0 && (
         <>

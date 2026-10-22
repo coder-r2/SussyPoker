@@ -99,3 +99,15 @@ def test_opening_deal_and_animated_autoplay_return_events():
     assert played == types.count("hand_end") and r["state"]["legal"]
     r = client.post(f"/api/sessions/{sid}/autoplay", json={"hands": 2}).json()
     assert r["events"] == [] and r["state"]["hands_played"] >= played + 2  # not animated unless asked
+
+
+def test_top3_rank_alone_is_not_suspicious():
+    # someone is always in the top 3 of 15 pairs: "suspected" also needs the risk above the warning line
+    sid = client.post("/api/sessions", json={"strategy": "honest"}).json()["session_id"]
+    client.post(f"/api/sessions/{sid}/autoplay", json={"hands": 40, "user_mode": "honest"})
+    mine = next(p for p in STORE.get(sid).detector.pairs if p["you_and_partner"])
+    mine |= {"rank": 2, "risk": 0.0005, "flagged": False, "watched": False}
+    report = client.get(f"/api/sessions/{sid}/report").json()
+    assert report["verdict"] == "clear" and report["headline"].startswith("Cleared")
+    mine |= {"risk": 0.02, "watched": True}
+    assert client.get(f"/api/sessions/{sid}/report").json()["verdict"] == "suspected"

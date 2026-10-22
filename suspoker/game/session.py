@@ -42,6 +42,9 @@ VIRTUAL_POOL = {"n_shared": 30 * 29 / (6 * 5), "hands_max": 30 / 6, "hands_min":
 NEUTRAL = [f for f, (family, _) in CATALOG.items() if family == "F8 presence"]
 STRATEGIES = ("soft_play", "directed_transfer", "coordinated_isolation", "honest")
 REVIEW_THRESHOLD = 0.093        # SimRoom break-even risk: pairs above it would be reviewed by an investigator
+# warning line: ~99th percentile of innocent pairs' risk at 50-100 hands in simulated live games. A top-3 rank alone
+# is not suspicious (someone is always top 3 of 15), so "suspected" also needs the risk above this line.
+WATCH_THRESHOLD = 0.005
 YOU = "SIM-YOU"
 TABLE = "SIM-GAME"
 BOT_STYLES = ("TAG", "LAG", "nit", "calling_station", "maniac")
@@ -242,7 +245,8 @@ class Session:
                 "players": [{"seat": seat[m], "name": self.names[m], "is_you": m == YOU,
                              "is_partner": m == self.partner} for m in sorted(members, key=seat.get)],
                 "you_and_partner": set(members) == {YOU, self.partner},
-                "drivers": drivers.get(r["pair_id"], []), "flagged": r["risk"] >= REVIEW_THRESHOLD})
+                "drivers": drivers.get(r["pair_id"], []), "flagged": r["risk"] >= REVIEW_THRESHOLD,
+                "watched": r["risk"] >= WATCH_THRESHOLD})
         you_rank = next((p["rank"] for p in pairs if p["you_and_partner"]), None)
         self.detector = Detector("scored", n, pairs, you_rank)
         return self.detector
@@ -266,10 +270,14 @@ class Session:
         benign = w.pairs.filter(pl.col("pair_id") == mine["pair_id"])["benign"].to_list()[0]
         if mine["rank"] == 1 and mine["flagged"]:
             verdict, headline = "caught", "Caught: you are the detector's #1 pair and above the review threshold."
-        elif mine["flagged"] or mine["rank"] <= 3:
-            verdict, headline = "suspected", f"Suspected: your pair ranks #{mine['rank']} of {len(d.pairs)}."
+        elif mine["flagged"] or (mine["watched"] and mine["rank"] <= 3):
+            verdict, headline = "suspected", (f"Suspected: your pair ranks #{mine['rank']} of {len(d.pairs)} and is above "
+                                              "the warning line.")
+        elif self.strategy == "honest":
+            verdict, headline = "clear", f"Cleared: your pair ranks #{mine['rank']} of {len(d.pairs)}, below the warning line."
         else:
-            verdict, headline = "clear", f"You got away with it: your pair ranks #{mine['rank']} of {len(d.pairs)}."
+            verdict, headline = "clear", (f"You got away with it: your pair ranks #{mine['rank']} of {len(d.pairs)}, below "
+                                          "the warning line.")
         coordinated = set(self.coordinated)
         return {"verdict": verdict, "headline": headline, "hands": self.hands_played, "you": mine,
                 "evidence": [{"rank": r["rank"], "hand_id": r["hand_id"], "score": r["score"], "tags": r["tags"],
@@ -370,7 +378,7 @@ class Session:
     def detector_json(self) -> dict:
         d = self.detector
         return {"status": d.status, "hands": d.hands, "needed": MIN_SHARED, "threshold": REVIEW_THRESHOLD,
-                "pairs": d.pairs, "you_rank": d.you_rank}
+                "watch": WATCH_THRESHOLD, "pairs": d.pairs, "you_rank": d.you_rank}
 
 
 def describe(row: dict) -> str:

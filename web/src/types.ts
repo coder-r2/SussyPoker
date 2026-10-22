@@ -369,13 +369,15 @@ export interface DetectorPair {
   you_and_partner: boolean;
   drivers: { label: string; shap: number }[]; // top 3 reasons pushing the risk up
   flagged: boolean; // risk >= threshold
+  watched: boolean; // risk >= watch (the warning line)
 }
 
 export interface DetectorState {
   status: "insufficient" | "scored";
   hands: number;
   needed: number; // shared hands before a verdict (38)
-  threshold: number;
+  threshold: number; // investigation line
+  watch: number; // warning line: "suspected" needs a top-3 rank AND risk above it
   pairs: DetectorPair[];
   you_rank: number | null;
 }
