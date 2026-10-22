@@ -1,14 +1,15 @@
 import { lazy, Suspense, useEffect } from "react";
 import { HashRouter, Link, Route, Routes, useLocation } from "react-router-dom";
 import { Layout } from "./components/Layout";
+import { Status } from "./components/ui";
 import { Alerts } from "./pages/Alerts";
 import { Hand } from "./pages/Hand";
 import { Home } from "./pages/Home";
+import { HowItWorks } from "./pages/HowItWorks";
 import { Play } from "./pages/Play";
 
-// the chart pages pull in Recharts: load them on demand
+// the case-file page draws charts with Recharts: load it on demand
 const Pair = lazy(() => import("./pages/Pair").then((m) => ({ default: m.Pair })));
-const ModelCard = lazy(() => import("./pages/ModelCard").then((m) => ({ default: m.ModelCard })));
 
 function ScrollToTop() {
   const { pathname } = useLocation();
@@ -18,14 +19,13 @@ function ScrollToTop() {
   return null;
 }
 
-const TITLES: Record<string, string> = { "": "SusPoker", alerts: "Alerts", pair: "Pair", hand: "Hand", model: "Model card",
-  play: "Beat the Detector" };
+const TITLES: Record<string, string> = { "": "Beat the Detector", play: "Play", alerts: "Case files", pair: "Case file",
+  hand: "Hand replay", how: "How it works", model: "How it works" };
 
 function Title() {
   const { pathname } = useLocation();
   useEffect(() => {
-    const t = TITLES[pathname.split("/")[1] ?? ""] ?? "SusPoker";
-    document.title = t === "SusPoker" ? t : `${t} · SusPoker`;
+    document.title = `SusPoker · ${TITLES[pathname.split("/")[1] ?? ""] ?? "Beat the Detector"}`;
   }, [pathname]);
   return null;
 }
@@ -37,16 +37,17 @@ export function App() {
       <ScrollToTop />
       <Title />
       <Layout>
-        <Suspense fallback={<p className="muted">Loading…</p>}>
-        <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/alerts" element={<Alerts />} />
-          <Route path="/pair/:pairId" element={<Pair />} />
-          <Route path="/hand/:handId" element={<Hand />} />
-          <Route path="/model" element={<ModelCard />} />
-          <Route path="/play" element={<Play />} />
-          <Route path="*" element={<p>Page not found. <Link to="/">Home</Link></p>} />
-        </Routes>
+        <Suspense fallback={<Status />}>
+          <Routes>
+            <Route path="/" element={<Home />} />
+            <Route path="/play" element={<Play />} />
+            <Route path="/alerts" element={<Alerts />} />
+            <Route path="/pair/:pairId" element={<Pair />} />
+            <Route path="/hand/:handId" element={<Hand />} />
+            <Route path="/how" element={<HowItWorks />} />
+            <Route path="/model" element={<HowItWorks />} />
+            <Route path="*" element={<p>Page not found. <Link to="/">Home</Link></p>} />
+          </Routes>
         </Suspense>
       </Layout>
     </HashRouter>

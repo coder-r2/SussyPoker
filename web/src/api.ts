@@ -1,4 +1,4 @@
-import type { DetectorState, Direction, GameReport, GameState, HandReplay, Highlight, Strategy } from "./types";
+import type { DetectorState, Direction, GameEvent, GameReport, GameState, HandReplay, Highlight, Strategy } from "./types";
 
 // Game API (FastAPI). Locally: `uvicorn api.main:app --port 8000`. In production the Hugging Face Space URL is set
 // at build time with VITE_API_BASE.
@@ -34,7 +34,7 @@ export const api = {
   create: (req: NewSession) => call<{ session_id: string; state: GameState }>("/api/sessions", req),
   state: (id: string) => call<{ state: GameState }>(`/api/sessions/${id}`),
   act: (id: string, action: string, amount?: number) =>
-    call<{ state: GameState; hand_complete: boolean; detector: DetectorState | null }>(`/api/sessions/${id}/action`,
+    call<{ state: GameState; hand_complete: boolean; detector: DetectorState | null; events: GameEvent[] }>(`/api/sessions/${id}/action`,
       { action, amount }),
   autoplay: (id: string, hands: number, user_mode: "colluding" | "honest") =>
     call<{ state: GameState; detector: DetectorState }>(`/api/sessions/${id}/autoplay`, { hands, user_mode }),

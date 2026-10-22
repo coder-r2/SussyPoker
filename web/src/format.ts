@@ -8,6 +8,22 @@ export const FAMILY_LABEL: Record<Behavior, string> = {
   none: "None",
 };
 
+export const FAMILY_EMOJI: Record<Behavior, string> = {
+  directed_transfer: "💸",
+  soft_play: "🤝",
+  coordinated_isolation: "🎯",
+  other_coordination: "❓",
+  none: "😇",
+};
+
+export const FAMILY_BLURB: Record<Behavior, string> = {
+  directed_transfer: "one player quietly feeds chips to the other",
+  soft_play: "partners go easy on each other",
+  coordinated_isolation: "partners squeeze everyone else out of the pot",
+  other_coordination: "teamwork of an unknown kind",
+  none: "no teamwork",
+};
+
 export const FAMILY_COLOR: Record<Behavior, string> = {
   directed_transfer: "var(--fam-dt)",
   soft_play: "var(--fam-sp)",
@@ -17,10 +33,10 @@ export const FAMILY_COLOR: Record<Behavior, string> = {
 };
 
 export const DECOY_LABEL: Record<string, string> = {
-  tilt: "Decoy: tilt",
-  passive_player: "Decoy: passive player",
-  similar_styles: "Decoy: similar styles",
-  seated_together: "Decoy: seated together",
+  tilt: "Decoy: a tilting player",
+  passive_player: "Decoy: a pushover",
+  similar_styles: "Decoy: look-alike styles",
+  seated_together: "Decoy: always sit together",
 };
 
 export const STYLE_LABEL: Record<string, string> = {

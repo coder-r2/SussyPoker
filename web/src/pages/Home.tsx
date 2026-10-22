@@ -1,69 +1,99 @@
 import { Link } from "react-router-dom";
-import { REPO } from "../components/Layout";
-import { Status, Term, Tile } from "../components/ui";
+import { Card } from "../components/Table";
 import { loadModelCard, loadSummary, useData } from "../data";
-import { fmt } from "../format";
+import { FAMILY_BLURB, FAMILY_COLOR, FAMILY_EMOJI, fmt } from "../format";
+import type { Family } from "../types";
+
+const SCHEMES: { id: Family; name: string; how: string }[] = [
+  { id: "directed_transfer", name: "Chip dump", how: "Your partner folds good hands to you and pays you off with bad ones." },
+  { id: "soft_play", name: "Soft play", how: "You never bet into each other and check it down when it's just you two." },
+  { id: "coordinated_isolation", name: "Squeeze play", how: "You open, your partner re-raises, and everyone else gets pushed out." },
+];
 
 export function Home() {
-  const s = useData(loadSummary, "summary");
   const mc = useData(loadModelCard, "card");
-  if (!s.data || !mc.data) return <Status error={s.error ?? mc.error} />;
-  const sum = s.data;
-  const sim = sum.metrics.models.M_full;
-  const window = mc.data.repeated_cv.window_final as { mean: number; sd: number };
+  const s = useData(loadSummary, "summary");
+  const k = mc.data?.kaggle;
+  const deployed = k?.submissions.find((x) => x.deployed);
   return (
     <div>
-      <h1>Catching poker players who secretly work together</h1>
-      <p style={{ maxWidth: 760 }}>
-        Two players at the same table can quietly team up: one feeds chips to the other, they go easy on each other, or
-        they squeeze everyone else out. SusPoker is a detector for that kind of collusion. It reads hand histories,
-        ranks every pair of players by risk, names the likely scheme, and picks the five hands an investigator should
-        look at first, with a plain-English reason for each. It was trained on the Kaggle competition{" "}
-        <em>Detect Suspicious Value Transfers in Poker</em>, then tested on a card room we simulated ourselves.
-      </p>
+      <section className="hero">
+        <div>
+          <span className="pill" style={{ background: "rgba(255,255,255,.2)", color: "#fff" }}>🎮 A poker game with a twist</span>
+          <h1 style={{ marginTop: 12 }}>Can you cheat at poker without getting caught?</h1>
+          <p className="lead">Team up with a secret bot partner, rig the game, and try to stay under the radar. An AI detector is
+            watching every single hand.</p>
+          <div className="row" style={{ marginTop: 18, gap: 12 }}>
+            <Link to="/play" className="btn big">▶ Play Beat the Detector</Link>
+            <Link to="/alerts" className="btn ghost">🕵️ Browse the case files</Link>
+          </div>
+        </div>
+        <div className="hero-art" aria-hidden>
+          <span style={{ position: "absolute", left: "8%", top: "12%", rotate: "-14deg" }}><Card card="Ah" /></span>
+          <span style={{ position: "absolute", left: "34%", top: "2%", rotate: "4deg", animationDelay: "-1.5s" }}><Card card="Ks" /></span>
+          <span style={{ position: "absolute", left: "22%", top: "42%", rotate: "-4deg" }}><Card card="Qd" /></span>
+          <div className="eye">👁️</div>
+        </div>
+      </section>
 
-      <div className="grid grid-4" style={{ margin: "18px 0" }}>
-        <Tile term="kaggle" label="Kaggle score (hidden test set)" value={fmt.num(sum.kaggle.deployed.private, 3)}
-          sub={`deployed model, private leaderboard · best ${fmt.num(sum.kaggle.best_private, 3)}`} />
-        <Tile term="window" label="Local validation" value={`${fmt.num(window.mean, 3)}`}
-          sub={`final score, window view, ± ${fmt.num(window.sd, 3)} over 3 fold seeds`} />
-        <Tile term="final" label="SimRoom (our simulator)" value={fmt.num(sim.final, 3)}
-          sub={`Pair AP ${fmt.num(sim.pair_ap, 2)} vs ${fmt.num(sum.metrics.base_rate, 3)} for a random ranking`} />
-        <Tile label="Simulated hands" value={fmt.int(sum.simroom.hands)}
-          sub={`${sum.simroom.tables} tables · ${fmt.int(sum.metrics.pairs_scored)} pairs scored`} />
+      <h2 style={{ textAlign: "center", marginTop: 42 }}>How to play</h2>
+      <div className="grid grid-3">
+        {[
+          ["🤝", "Pick your scheme", "Choose how you and your secret partner will cheat, and how often."],
+          ["🃏", "Play the hands", "Fold, call or raise against five bots. Your partner plays along. Auto-play when you're in a hurry."],
+          ["🕵️", "Dodge the detector", "After every hand the detector re-ranks all 15 pairs at the table. Stay off the top of its list!"],
+        ].map(([e, t, d], i) => (
+          <div key={t} className="card step" style={{ animation: `fadeUp .5s ${i * 0.12}s both` }}>
+            <span className="big-emoji" style={{ animationDelay: `${i * 0.4}s` }}>{e}</span>
+            <h3 style={{ marginTop: 0 }}>{i + 1}. {t}</h3>
+            <p className="muted" style={{ marginBottom: 0 }}>{d}</p>
+          </div>
+        ))}
       </div>
-      <p className="small muted" style={{ maxWidth: 760 }}>
-        The three scores use the competition's <Term k="final">final score</Term> formula. Kaggle and local validation
-        measure the competition's own world; the SimRoom measures how well the model transfers to collusion written by
-        us, which it only partly does (see the model card, section 9).
-      </p>
 
-      <div className="grid grid-3" style={{ marginTop: 18 }}>
-        <Link to="/alerts" className="section-link">
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Investigator dashboard →</h3>
-            <p className="muted">Every pair in the SimRoom ranked by risk, with the simulator's answer key. Open a pair to
-              see why it was flagged, its chip-flow timeline, its evidence hands and an innocent explanation to rule out.</p>
+      <h2 style={{ textAlign: "center", marginTop: 42 }}>Three ways to cheat</h2>
+      <div className="grid grid-3">
+        {SCHEMES.map((x) => (
+          <div key={x.id} className="card scheme-card">
+            <span className="ribbon" style={{ background: FAMILY_COLOR[x.id] }} />
+            <div className="row"><span style={{ fontSize: "2rem" }}>{FAMILY_EMOJI[x.id]}</span>
+              <div><h3 style={{ margin: 0 }}>{x.name}</h3><div className="small muted">{FAMILY_BLURB[x.id]}</div></div></div>
+            <p style={{ margin: "10px 0 0" }}>{x.how}</p>
           </div>
-        </Link>
-        <Link to="/model" className="section-link">
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Model card →</h3>
-            <p className="muted">How the detector was built and validated, Kaggle results, what drives its scores, where
-              it fails, and how it transfers to a different poker world.</p>
-          </div>
-        </Link>
-        <Link to="/play" className="section-link">
-          <div className="card">
-            <h3 style={{ marginTop: 0 }}>Beat the Detector →</h3>
-            <p className="muted">Sit at a table with five bots, one of them your secret partner, and try to collude
-              without getting caught while the detector watches every hand.</p>
-          </div>
-        </Link>
+        ))}
       </div>
-      <p style={{ marginTop: 18 }} className="small">
-        Source code, data-use notes and how to reproduce everything: <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>.
-      </p>
+
+      <div className="grid grid-2" style={{ marginTop: 42 }}>
+        <div className="card" style={{ background: "var(--grad-warm)", color: "#fff", border: 0 }}>
+          <div className="pill" style={{ background: "rgba(255,255,255,.22)", color: "#fff" }}>🏆 Tested on Kaggle</div>
+          <h3 style={{ color: "#fff" }}>Trained on a real data-science competition</h3>
+          <p>The detector was built for Kaggle's <em>Detect Suspicious Value Transfers in Poker</em>, then scored on 112,540 player
+            pairs it had never seen.</p>
+          {deployed && k ? (
+            <div className="row" style={{ alignItems: "flex-end", gap: 18 }}>
+              <div><div className="stat-hero">{fmt.num(deployed.private, 3)}</div><div className="small">Kaggle score (hidden test set)</div></div>
+              <div className="small" style={{ opacity: 0.95 }}>Better than the typical team ({k.leaderboard.median}) out of {k.leaderboard.teams};
+                the winner scored {k.leaderboard.top}.</div>
+            </div>
+          ) : <p className="small">Loading score…</p>}
+        </div>
+        <div className="card">
+          <div className="pill">🕵️ Case files</div>
+          <h3>Play detective first</h3>
+          <p>Our bots played {s.data ? fmt.int(s.data.simroom.hands) : "30,000"} hands in a simulated card room. Some of them were told to
+            cheat. Browse every suspicious pair, replay the hands, and reveal who was really guilty.</p>
+          <Link to="/alerts" className="btn cool">Open the case files →</Link>
+        </div>
+      </div>
+
+      <div className="cta-band" style={{ marginTop: 42 }}>
+        <span style={{ fontSize: "2.4rem" }}>😎</span>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <h2>Think you can fool it?</h2>
+          <div style={{ opacity: 0.95 }}>One session takes a couple of minutes. No sign-up, nothing saved.</div>
+        </div>
+        <Link to="/play" className="btn big" style={{ background: "#fff", color: "#6d28d9" }}>Sit down at the table</Link>
+      </div>
     </div>
   );
 }

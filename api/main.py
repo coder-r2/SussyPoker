@@ -99,7 +99,8 @@ def act(sid: str, req: Action) -> dict:
             done = s.act(req.action, req.amount)
         except ValueError as e:
             raise HTTPException(409, str(e)) from None
-        return {"state": s.state(), "hand_complete": done, "detector": s.detector_json() if done else None}
+        return {"state": s.state(), "hand_complete": done, "detector": s.detector_json() if done else None,
+                "events": s.take_events()}
 
 
 @app.post("/api/sessions/{sid}/autoplay")

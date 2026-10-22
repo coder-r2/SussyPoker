@@ -102,6 +102,7 @@ class Session:
         self.autoplay_mode: str | None = None
         self.detector = Detector("insufficient", 0)
         self.last_hand: dict | None = None
+        self.events: list[dict] | None = None  # table snapshots after each step of the last user action
         self._deal()
         self._run_bots()
 
@@ -126,6 +127,7 @@ class Session:
         self.policy.new_hand(n, self.players)
         self.hand = Hand([SeatIn(p, self.stacks[p]) for p in self.players], self.button, SB, BB,
                          self.rng.sample(range(52), 52))
+        self._emit("new_hand", None)
 
     def _decide(self, v: View) -> Decision:
         return self.policy(v)
@@ -146,7 +148,7 @@ class Session:
                 d, _ = _honest(self.policy, v)
             else:
                 d = self._decide(v)
-            self.hand.act(d)
+            self._emit("action", self.hand.act(d))
 
     def _finish_hand(self) -> None:
         rec = self.hand.record()
@@ -161,6 +163,8 @@ class Session:
         self.log.add(rec, self.hand_id, TABLE, when, "simulation")
         self.equity.append(_hand_equity(*log.frames()))
         showdown = rec.hand["players_at_showdown"] > 0
+        if self.events is not None:
+            self.events.append({"type": "hand_end", "hand_id": self.hand_id, "table": self._table(rec)})
         self.last_hand = {
             "hand_id": self.hand_id, "board": rec.hand["board_cards"].split() if rec.hand["board_cards"] else [],
             "pot": rec.hand["final_pot"],
@@ -180,7 +184,8 @@ class Session:
         if v is None or v.player_id != YOU:
             raise ValueError("it is not your turn")
         before = self.hands_played
-        self.hand.act(_user_decision(v, action, amount))
+        self.events = []
+        self._emit("action", self.hand.act(_user_decision(v, action, amount)))
         self._run_bots()
         if self.hands_played > before:
             self.rescore()
@@ -191,6 +196,7 @@ class Session:
         if user_mode not in ("colluding", "honest"):
             raise ValueError("user_mode must be 'colluding' or 'honest'")
         self.autoplay_mode = user_mode
+        self.events = None  # auto-play is not animated
         try:
             for _ in range(hands):
                 if self.hand is None:
@@ -287,6 +293,44 @@ class Session:
         return r
 
     # ----------------------------------------------------------------------------------------------- state
+    def _emit(self, kind: str, row: dict | None) -> None:
+        """Record a table snapshot for the front end to animate step by step (only during a user action)."""
+        if self.events is None or self.hand is None:
+            return
+        ev = {"type": kind, "hand_id": self.hand_id, "table": self._table()}
+        if row is not None:
+            ev |= {"seat": self.players.index(row["player_id"]), "text": describe(row)}
+        self.events.append(ev)
+
+    def _table(self, rec=None) -> dict:
+        """What everyone at the table can see: stacks, chips in front, folds, the board, the pot. Hole cards only for
+        you, plus the cards shown at showdown once a hand (`rec`) is over."""
+        h = self.hand
+        seats = []
+        showdown = rec is not None and rec.hand["players_at_showdown"] > 0
+        by_player = {s["player_id"]: s for s in rec.seats} if rec is not None else {}
+        for i, p in enumerate(self.players):
+            k = h.idx[i]
+            acts = [a for a in h.actions if a["player_id"] == p]
+            seat = {"seat": i, "name": self.names[p], "is_you": p == YOU, "is_partner": p == self.partner,
+                    "stack": h.stack[k], "committed": h.commit[k], "folded": h.folded[k],
+                    "cards": [CARD_STRINGS[c] for c in h.hole[i]] if p == YOU else None,
+                    "last_action": describe(acts[-1]) if acts else None, "net": None}
+            if rec is not None:
+                r = by_player[p]
+                seat |= {"stack": r["starting_stack"] + r["net_chips"], "committed": 0, "net": r["net_chips"]}
+                if showdown and r["went_to_showdown"]:
+                    seat["cards"] = [r["hole_card_1"], r["hole_card_2"]]
+            seats.append(seat)
+        v = h.view() if rec is None else None
+        return {"seats": seats, "board": [CARD_STRINGS[c] for c in h.board],
+                "pot": rec.hand["final_pot"] if rec is not None else h.pot, "button_seat": h.button,
+                "street": STREET_NAMES[h.street], "to_act": v.seat if v is not None else None}
+
+    def take_events(self) -> list[dict]:
+        ev, self.events = self.events or [], None
+        return ev
+
     def state(self) -> dict:
         v = self.hand.view() if self.hand else None
         h = self.hand
@@ -300,7 +344,7 @@ class Session:
                          "cards": [CARD_STRINGS[c] for c in h.hole[i]] if p == YOU else None}
                 acts = [a for a in h.actions if a["player_id"] == p]
                 if acts:
-                    seat["last_action"] = f"{acts[-1]['action']} {acts[-1]['amount'] or ''}".strip()
+                    seat["last_action"] = describe(acts[-1])
             seats.append(seat)
         legal = None
         if v is not None and v.player_id == YOU:
@@ -326,6 +370,16 @@ class Session:
         d = self.detector
         return {"status": d.status, "hands": d.hands, "needed": MIN_SHARED, "threshold": REVIEW_THRESHOLD,
                 "pairs": d.pairs, "you_rank": d.you_rank}
+
+
+def describe(row: dict) -> str:
+    """A logged action in words, as a player would say it."""
+    a, amount = row["action"], row["amount"]
+    if a == "all_in":
+        return f"all-in {amount}"
+    if a == "raise":
+        return f"raises to {row['amount_to']}"
+    return {"fold": "folds", "check": "checks", "call": f"calls {amount}", "bet": f"bets {amount}"}[a]
 
 
 def _honest(policy: TablePolicy, v: View) -> tuple[Decision, float]:

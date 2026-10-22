@@ -390,3 +390,34 @@ export interface GameReport {
   bots: { seat: number; name: string; style: string; is_partner: boolean }[];
   coordinated_hands: string[]; // hands where your partner's collusion changed a decision
 }
+
+// ------------------------------------------------------------------ table snapshots (animated playback)
+export interface TableSeatView {
+  seat: number;
+  name: string;
+  stack: number;
+  committed: number;
+  folded: boolean;
+  cards: string[] | null; // null = face down
+  last_action: string | null;
+  net?: number | null; // set when the hand is over
+  is_you?: boolean;
+  is_partner?: boolean;
+}
+
+export interface TableView {
+  seats: TableSeatView[];
+  board: string[];
+  pot: number;
+  button_seat: number;
+  street?: Street;
+  to_act?: number | null;
+}
+
+export interface GameEvent {
+  type: "action" | "new_hand" | "hand_end";
+  hand_id: string;
+  table: TableView;
+  seat?: number; // who acted
+  text?: string; // "raises to 12"
+}

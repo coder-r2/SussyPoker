@@ -66,3 +66,21 @@ def test_session_cap_returns_503():
         assert client.post("/api/sessions", json={"strategy": "honest"}).status_code == 503
     finally:
         STORE.cap = cap
+
+
+def test_action_returns_step_by_step_events_for_animation():
+    sid = client.post("/api/sessions", json={"strategy": "soft_play", "partner_seat": 2}).json()["session_id"]
+    for _ in range(30):
+        legal = client.get(f"/api/sessions/{sid}").json()["state"]["legal"]
+        r = client.post(f"/api/sessions/{sid}/action", json={"action": "fold" if legal["fold"] else "check"}).json()
+        ev = r["events"]
+        assert ev and ev[0]["type"] == "action" and ev[0]["seat"] == 0  # your own move comes first
+        for e in ev:
+            t = e["table"]
+            assert len(t["seats"]) == 6 and t["seats"][0]["cards"]  # you always see your cards
+            hidden = [s for s in t["seats"][1:] if s["cards"] is not None]
+            assert e["type"] == "hand_end" or not hidden  # bots' cards only show at showdown
+        if any(e["type"] == "hand_end" for e in ev):
+            assert any(e["type"] == "new_hand" for e in ev)
+            return
+    raise AssertionError("no hand finished in 30 actions")

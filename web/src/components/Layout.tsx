@@ -1,84 +1,83 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { NavLink } from "react-router-dom";
 
-const CITATION = `@misc{detect-suspicious-value-transfers-in-poker,
-  author = {Slash — Detect Suspicious Value Transfers in Poker},
-  title = {Detect Suspicious Value Transfers in Poker},
-  year = {2026},
-  howpublished = {\\url{https://www.kaggle.com/competitions/detect-suspicious-value-transfers-in-poker}},
-  note = {Kaggle}
-}`;
 export const REPO = "https://github.com/coder-r2/SussyPoker";
-const COMPETITION = "https://www.kaggle.com/competitions/detect-suspicious-value-transfers-in-poker";
+export const COMPETITION = "https://www.kaggle.com/competitions/detect-suspicious-value-transfers-in-poker";
 
-type Theme = "system" | "light" | "dark";
+type Theme = "light" | "dark";
 
+const systemDark = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-color-scheme: dark)").matches;
+
+/** Follows the system until the visitor picks a theme with the sun/moon button (remembered in this browser). */
 function useTheme(): [Theme, () => void] {
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [chosen, setChosen] = useState<Theme | null>(() => {
     try {
-      return (localStorage.getItem("theme") as Theme) || "system";
+      const t = localStorage.getItem("theme");
+      return t === "light" || t === "dark" ? t : null;
     } catch {
-      return "system";
+      return null;
     }
   });
+  const [sys, setSys] = useState<Theme>(systemDark() ? "dark" : "light");
+  useEffect(() => {
+    const mq = window.matchMedia?.("(prefers-color-scheme: dark)");
+    const on = () => setSys(mq.matches ? "dark" : "light");
+    mq?.addEventListener("change", on);
+    return () => mq?.removeEventListener("change", on);
+  }, []);
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === "system") root.removeAttribute("data-theme");
-    else root.setAttribute("data-theme", theme);
+    if (chosen) root.setAttribute("data-theme", chosen);
+    else root.removeAttribute("data-theme");
     try {
-      localStorage.setItem("theme", theme);
+      if (chosen) localStorage.setItem("theme", chosen);
     } catch {
       /* storage may be unavailable */
     }
-  }, [theme]);
-  const next = () => setTheme((t) => (t === "system" ? "light" : t === "light" ? "dark" : "system"));
-  return [theme, next];
+  }, [chosen]);
+  const theme = chosen ?? sys;
+  return [theme, () => setChosen(theme === "dark" ? "light" : "dark")];
 }
 
+const Sun = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+    <circle cx="12" cy="12" r="4.5" />
+    {[0, 45, 90, 135, 180, 225, 270, 315].map((a) => (
+      <line key={a} x1="12" y1="2.5" x2="12" y2="5" transform={`rotate(${a} 12 12)`} />
+    ))}
+  </svg>
+);
+const Moon = () => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden><path d="M20.5 14.5A8.5 8.5 0 0 1 9.5 3.5a8.5 8.5 0 1 0 11 11Z" /></svg>
+);
+
 export function Layout({ children }: { children: ReactNode }) {
-  const [theme, nextTheme] = useTheme();
+  const [theme, toggle] = useTheme();
   return (
     <>
       <header className="site-header">
         <div className="wrap">
-          <NavLink to="/" className="brand">SusPoker</NavLink>
+          <NavLink to="/" className="brand"><span className="logo">♠</span>SusPoker</NavLink>
           <nav className="nav" aria-label="Main">
-            <NavLink to="/alerts">Alerts</NavLink>
-            <NavLink to="/model">Model card</NavLink>
-            <NavLink to="/play">Beat the Detector</NavLink>
-            <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
+            <NavLink to="/play" className="play-link">🎮 Beat the Detector</NavLink>
+            <NavLink to="/alerts">🕵️ Case files</NavLink>
+            <NavLink to="/how">💡 How it works</NavLink>
           </nav>
-          <button className="icon-btn small" onClick={nextTheme} title="Theme: system → light → dark">
-            Theme: {theme}
+          <button className="icon-btn" onClick={toggle} aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} mode`}>
+            {theme === "dark" ? <Sun /> : <Moon />}
           </button>
         </div>
       </header>
       <main className="wrap">{children}</main>
       <footer className="site-footer">
         <div className="wrap">
-          <p>
-            <strong>Simulated data.</strong> Every hand, player and pair on this site comes from our own simulator (the
-            SimRoom, IDs starting with <code>SIM-</code>). The detection models were trained on the Kaggle competition{" "}
-            <a href={COMPETITION} target="_blank" rel="noreferrer">Detect Suspicious Value Transfers in Poker</a> by Slash.
-            No competition data is shown or redistributed; the model card reports aggregates only.
-          </p>
-          <p>Please cite the competition data as:</p>
-          <pre>{CITATION}</pre>
-          <p>
-            Code: <a href={REPO} target="_blank" rel="noreferrer">coder-r2/SussyPoker</a> (MIT). A portfolio project, not a
-            production fraud tool.
-          </p>
+          <span><strong>♠ SusPoker</strong> · a portfolio project</span>
+          <span>Detector trained on Kaggle's <a href={COMPETITION} target="_blank" rel="noreferrer">Detect Suspicious Value Transfers in Poker</a> (Slash)</span>
+          <span className="spacer" />
+          <a href={REPO} target="_blank" rel="noreferrer">GitHub</a>
         </div>
       </footer>
     </>
-  );
-}
-
-export function SimBanner({ text }: { text?: string }) {
-  return (
-    <div className="banner" role="note">
-      {text ??
-        "Simulated hands: every hand on this dashboard was played by our bots in the SimRoom. The detector was trained on the Kaggle competition 'Detect Suspicious Value Transfers in Poker' (Slash); no competition data is shown."}
-    </div>
   );
 }
