@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "suspoker"
-version = "0.1.0"
+version = "1.0.0"
 description = "Detecting coordinated play (collusion) between poker players, with evidence hands an investigator can review."
 readme = "README.md"
 requires-python = ">=3.13"
