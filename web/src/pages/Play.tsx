@@ -19,11 +19,14 @@ const STRATEGIES: { id: Strategy; emoji: string; title: string; partner: string;
     you: "see whether an innocent pair ever looks guilty" },
 ];
 const SESSION_KEY = "suspoker-session";
-const DELAY = { action: 850, you: 380, new_hand: 900, hand_end: 2300 };
+// Table pace (ms), like a live room: each bot "thinks" for a while before it acts, new streets and hands get a beat.
+const PACE = { think: [800, 1800], act: 700, you: 400, street: 1100, new_hand: 1200, hand_end: 2800 };
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const thinkTime = () => PACE.think[0] + Math.random() * (PACE.think[1] - PACE.think[0]);
 
 type Phase = "checking" | "offline" | "setup" | "playing" | "report";
 type Shown = { view: TableView; bubble: { seat: number; text: string } | null; showNet: boolean; key: number };
+type AutoRun = { done: number; total: number; stopping: boolean };
 
 function viewFromState(s: GameState): TableView | null {
   if (!s.hand) return null;
@@ -49,9 +52,12 @@ export function Play() {
   const [shown, setShown] = useState<Shown | null>(null);
   const [toast, setToast] = useState<{ text: string; key: number } | null>(null);
   const [fast, setFast] = useState(false);
+  const [auto, setAuto] = useState<AutoRun | null>(null);
   const skip = useRef(false);
+  const stop = useRef<"no" | "stop" | "rush">("no");
   const fastRef = useRef(false);
   fastRef.current = fast;
+  const stepNo = useRef(0);
 
   // cold start: the free server sleeps when idle; poll /health until it answers (SPEC §7.9)
   useEffect(() => {
@@ -101,16 +107,37 @@ export function Play() {
     }
   }, []);
 
-  /** Play the server's step-by-step snapshots with a delay per move, then show the final state. */
-  const animate = useCallback(async (events: GameEvent[], final: GameState, det: DetectorState | null) => {
-    skip.current = false;
-    for (let i = 0; i < events.length && !skip.current; i++) {
-      const e = events[i];
-      setShown({ view: e.table, bubble: e.type === "action" && e.seat !== undefined ? { seat: e.seat, text: e.text ?? "" } : null,
-        showNet: e.type === "hand_end", key: i });
-      if (e.type === "hand_end") setToast({ text: resultLine(e.table), key: Date.now() });
-      const ms = e.type === "action" ? (e.seat === 0 ? DELAY.you : DELAY.action) : DELAY[e.type];
-      await sleep(fastRef.current ? ms * 0.35 : ms);
+  /** Play the server's step-by-step snapshots at table pace, then show the final state. Each player first "thinks"
+   * (a pulsing bubble over the seat), then acts; a new street waits a beat before its cards are turned. Your own
+   * clicks show at once unless you are `watching` auto-play. */
+  const animate = useCallback(async (events: GameEvent[], final: GameState, det: DetectorState | null,
+    from: TableView | null, watching = false) => {
+    const wait = (ms: number) => (skip.current ? Promise.resolve() : sleep(fastRef.current ? ms * 0.35 : ms));
+    const show = (view: TableView, bubble: Shown["bubble"], showNet = false) =>
+      setShown({ view, bubble, showNet, key: ++stepNo.current });
+    let cur = from;
+    for (const e of events) {
+      if (skip.current) break;
+      if (e.type === "action" && e.seat !== undefined) {
+        const mine = e.seat === final.you_seat && !watching;
+        if (!mine && cur) {
+          show({ ...cur, to_act: e.seat }, { seat: e.seat, text: "…" });
+          await wait(thinkTime());
+        }
+        const prevBoard = cur?.board ?? e.table.board;
+        const newStreet = e.table.board.length > prevBoard.length;
+        show(newStreet ? { ...e.table, board: prevBoard, to_act: null } : e.table, { seat: e.seat, text: e.text ?? "" });
+        await wait(mine ? PACE.you : PACE.act);
+        if (newStreet) {
+          show(e.table, null);
+          await wait(PACE.street);
+        }
+      } else {
+        show(e.table, null, e.type === "hand_end");
+        if (e.type === "hand_end" && !skip.current) setToast({ text: resultLine(e.table), key: Date.now() });
+        await wait(e.type === "hand_end" ? PACE.hand_end : PACE.new_hand);
+      }
+      cur = e.table;
     }
     setShown(null);
     setState(final);
@@ -119,31 +146,52 @@ export function Play() {
 
   const start = (strategy: Strategy, intensity: number, direction: Direction, partnerSeat: number | null) =>
     guard("Shuffling…", async () => {
+      skip.current = false; // reset before each request, so a Skip pressed while it loads still counts
       const r = await api.create({ strategy, intensity, direction, partner_seat: partnerSeat });
       try { sessionStorage.setItem(SESSION_KEY, r.session_id); } catch { /* ignore */ }
-      setState(r.state);
       setDetector(await api.detector(r.session_id));
       setReport(null);
+      setState(r.state);
       setPhase("playing");
+      await animate(r.events ?? [], r.state, null, null);
     });
 
   const act = (action: string, amount?: number) => state && guard("playing", async () => {
+    skip.current = false;
     const r = await api.act(state.session_id, action, amount);
-    await animate(r.events ?? [], r.state, r.detector);
+    await animate(r.events ?? [], r.state, r.detector, viewFromState(state));
   });
 
+  /** Auto-play one hand at a time and watch each at table pace; "Finish instantly" plays the rest without animation. */
   const autoplay = (hands: number, mode: "colluding" | "honest") => state && guard("Auto-playing…", async () => {
-    let left = Math.min(hands, state.max_hands - state.hands_played);
+    const total = Math.min(hands, state.max_hands - state.hands_played);
     let s = state;
-    while (left > 0) {
-      const step = Math.min(10, left);
-      setBusy(`Auto-playing… ${hands - left} / ${hands}`);
-      const r = await api.autoplay(s.session_id, step, mode);
-      s = r.state;
-      setState(r.state);
-      setDetector(r.detector);
-      left -= step;
-      if (s.finished) break;
+    let done = 0;
+    stop.current = "no";
+    setAuto({ done, total, stopping: false });
+    try {
+      while (done < total && !s.finished && stop.current === "no") {
+        const before = s.hands_played;
+        skip.current = false;
+        const r = await api.autoplay(s.session_id, 1, mode, true);
+        await animate(r.events ?? [], r.state, r.detector, viewFromState(s), true);
+        done += Math.max(1, r.state.hands_played - before);
+        s = r.state;
+        setAuto((a) => a && { ...a, done });
+      }
+      const rush = (stop.current as string) === "rush"; // set by the button while the loop above awaited
+      if (rush) setAuto(null);
+      while (rush && done < total && !s.finished) { // finish the rest instantly
+        const step = Math.min(10, total - done);
+        setBusy(`Auto-playing… ${done} / ${total}`);
+        const r = await api.autoplay(s.session_id, step, mode);
+        done += step;
+        s = r.state;
+        setState(r.state);
+        setDetector(r.detector);
+      }
+    } finally {
+      setAuto(null);
     }
   });
 
@@ -168,8 +216,9 @@ export function Play() {
       )}
       {phase === "setup" && <Setup onStart={start} busy={!!busy} />}
       {phase === "playing" && state && (
-        <PlayingView state={state} shown={shown} detector={detector} busy={busy} fast={fast} setFast={setFast}
-          onSkip={() => { skip.current = true; }} onAct={act} onAutoplay={autoplay} onFinish={finish} onOpenHand={openHand} />
+        <PlayingView state={state} shown={shown} detector={detector} busy={busy} fast={fast} setFast={setFast} auto={auto}
+          onSkip={() => { skip.current = true; }} onAct={act} onAutoplay={autoplay} onFinish={finish} onOpenHand={openHand}
+          onStop={(how) => { stop.current = how; skip.current = true; setAuto((a) => a && { ...a, stopping: true }); }} />
       )}
       {phase === "report" && report && state && (
         <ReportView report={report} state={state} onOpenHand={openHand} onRestart={() => {
@@ -261,14 +310,16 @@ function Setup({ onStart, busy }: { onStart: (s: Strategy, i: number, d: Directi
 }
 
 // ------------------------------------------------------------------ playing
-function PlayingView({ state, shown, detector, busy, fast, setFast, onSkip, onAct, onAutoplay, onFinish, onOpenHand }: {
+function PlayingView({ state, shown, detector, busy, fast, setFast, auto, onSkip, onStop, onAct, onAutoplay, onFinish,
+  onOpenHand }: {
   state: GameState; shown: Shown | null; detector: DetectorState | null; busy: string | null; fast: boolean;
-  setFast: (f: boolean) => void; onSkip: () => void; onAct: (a: string, amt?: number) => void;
-  onAutoplay: (n: number, m: "colluding" | "honest") => void; onFinish: () => void; onOpenHand: (h: string) => void }) {
+  setFast: (f: boolean) => void; auto: AutoRun | null; onSkip: () => void; onStop: (how: "stop" | "rush") => void;
+  onAct: (a: string, amt?: number) => void; onAutoplay: (n: number, m: "colluding" | "honest") => void; onFinish: () => void;
+  onOpenHand: (h: string) => void }) {
   const [mode, setMode] = useState<"colluding" | "honest">(state.strategy === "honest" ? "honest" : "colluding");
   const strat = STRATEGIES.find((s) => s.id === state.strategy)!;
   const view = shown?.view ?? viewFromState(state);
-  const animating = shown !== null;
+  const animating = shown !== null || auto !== null;
   const labels = { [state.you_seat]: { text: "You", kind: "you" as const }, [state.partner_seat]: { text: "Partner", kind: "partner" as const } };
   return (
     <div>
@@ -287,10 +338,17 @@ function PlayingView({ state, shown, detector, busy, fast, setFast, onSkip, onAc
           <div className="card" style={{ marginTop: 10, padding: 14 }}>
             {animating ? (
               <div className="row">
-                <span className="thinking">Bots are playing <i /><i /><i /></span>
+                <span className="thinking">{!auto ? "Bots are playing" : auto.stopping ? "Stopping after this hand"
+                  : `${mode === "honest" ? "😇" : "😈"} Auto-playing hand ${Math.min(auto.done + 1, auto.total)} of ${auto.total}`}
+                  {" "}<i /><i /><i /></span>
                 <span className="spacer" />
-                <button className="btn small" onClick={() => setFast(!fast)} title="Animation speed">{fast ? "🐇 Fast" : "🐢 Normal"}</button>
-                <button className="btn small" onClick={onSkip}>Skip ⏭</button>
+                <button className="btn small" onClick={() => setFast(!fast)} title="Table speed">{fast ? "🐇 Fast" : "🐢 Normal"}</button>
+                <button className="btn small" onClick={onSkip} title="Jump to the end of this hand">Skip ⏭</button>
+                {auto && !auto.stopping && <>
+                  <button className="btn small" onClick={() => onStop("rush")} title="Play the remaining hands without animation">
+                    Finish instantly ⏩</button>
+                  <button className="btn small" onClick={() => onStop("stop")}>⏹ Stop</button>
+                </>}
               </div>
             ) : state.legal ? <Controls state={state} disabled={!!busy} onAct={onAct} />
               : <p className="muted" style={{ margin: 0 }}>{state.finished ? "That's 500 hands: the session is over." : busy ?? "Waiting…"}</p>}
@@ -306,7 +364,7 @@ function PlayingView({ state, shown, detector, busy, fast, setFast, onSkip, onAc
             <span className="spacer" />
             <button className="btn small" disabled={!!busy || animating} onClick={onFinish}>🏁 End & see verdict</button>
           </div>
-          {busy && busy.startsWith("Auto") && <Progress label={busy} />}
+          {busy && busy.startsWith("Auto") && !auto && <Progress label={busy} />}
           {state.last_hand && !animating && (
             <p className="small muted" style={{ marginTop: 10 }}>Last hand: <button className="linkish" onClick={() => onOpenHand(state.last_hand!.hand_id)}>
               🎬 replay {state.last_hand.hand_id}</button></p>

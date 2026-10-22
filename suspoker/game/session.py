@@ -102,7 +102,7 @@ class Session:
         self.autoplay_mode: str | None = None
         self.detector = Detector("insufficient", 0)
         self.last_hand: dict | None = None
-        self.events: list[dict] | None = None  # table snapshots after each step of the last user action
+        self.events: list[dict] | None = []  # table snapshots after each step of the last request (for animation)
         self._deal()
         self._run_bots()
 
@@ -191,12 +191,13 @@ class Session:
             self.rescore()
         return self.hands_played > before
 
-    def autoplay(self, hands: int, user_mode: str) -> None:
-        """Play `hands` hands with the user's seat run by bot logic ('colluding' or 'honest')."""
+    def autoplay(self, hands: int, user_mode: str, animate: bool = False) -> None:
+        """Play `hands` hands with the user's seat run by bot logic ('colluding' or 'honest'). With `animate`, record
+        every step so the front end can play the hands out at table pace."""
         if user_mode not in ("colluding", "honest"):
             raise ValueError("user_mode must be 'colluding' or 'honest'")
         self.autoplay_mode = user_mode
-        self.events = None  # auto-play is not animated
+        self.events = [] if animate else None
         try:
             for _ in range(hands):
                 if self.hand is None:

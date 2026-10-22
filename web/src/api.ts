@@ -31,13 +31,14 @@ export interface NewSession { strategy: Strategy; direction?: Direction; intensi
 
 export const api = {
   health: () => call<{ status: string; model_version: string; git_sha: string }>("/api/health"),
-  create: (req: NewSession) => call<{ session_id: string; state: GameState }>("/api/sessions", req),
+  create: (req: NewSession) => call<{ session_id: string; state: GameState; events: GameEvent[] }>("/api/sessions", req),
   state: (id: string) => call<{ state: GameState }>(`/api/sessions/${id}`),
   act: (id: string, action: string, amount?: number) =>
     call<{ state: GameState; hand_complete: boolean; detector: DetectorState | null; events: GameEvent[] }>(`/api/sessions/${id}/action`,
       { action, amount }),
-  autoplay: (id: string, hands: number, user_mode: "colluding" | "honest") =>
-    call<{ state: GameState; detector: DetectorState }>(`/api/sessions/${id}/autoplay`, { hands, user_mode }),
+  autoplay: (id: string, hands: number, user_mode: "colluding" | "honest", animate = false) =>
+    call<{ state: GameState; detector: DetectorState; events: GameEvent[] }>(`/api/sessions/${id}/autoplay`,
+      { hands, user_mode, animate }),
   detector: (id: string) => call<DetectorState>(`/api/sessions/${id}/detector`),
   report: (id: string) => call<GameReport>(`/api/sessions/${id}/report`),
   hand: (id: string, handId: string) => call<HandReplay>(`/api/sessions/${id}/hands/${handId}`),

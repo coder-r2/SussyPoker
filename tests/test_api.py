@@ -84,3 +84,18 @@ def test_action_returns_step_by_step_events_for_animation():
             assert any(e["type"] == "new_hand" for e in ev)
             return
     raise AssertionError("no hand finished in 30 actions")
+
+
+def test_opening_deal_and_animated_autoplay_return_events():
+    r = client.post("/api/sessions", json={"strategy": "directed_transfer", "partner_seat": 4}).json()
+    assert r["events"][0]["type"] == "new_hand"  # the first deal is animated up to your turn
+    sid = r["session_id"]
+    r = client.post(f"/api/sessions/{sid}/autoplay", json={"hands": 1, "animate": True}).json()
+    types = [e["type"] for e in r["events"]]
+    # one hand, then the next is dealt up to your turn (rarely a walk: all fold to your big blind, one more hand ends)
+    assert types.count("hand_end") >= 1 and types[-1] != "hand_end"
+    assert any(e["type"] == "action" and e["seat"] == 0 for e in r["events"])  # your seat's auto moves are shown
+    played = r["state"]["hands_played"]
+    assert played == types.count("hand_end") and r["state"]["legal"]
+    r = client.post(f"/api/sessions/{sid}/autoplay", json={"hands": 2}).json()
+    assert r["events"] == [] and r["state"]["hands_played"] >= played + 2  # not animated unless asked

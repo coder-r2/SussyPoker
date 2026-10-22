@@ -58,6 +58,7 @@ class Action(BaseModel):
 class Autoplay(BaseModel):
     hands: int = Field(..., ge=1, le=50)
     user_mode: Literal["colluding", "honest"] = "colluding"
+    animate: bool = False  # return step-by-step events (meant for one hand at a time)
 
 
 def _session(sid: str):
@@ -81,7 +82,7 @@ def create_session(req: NewSession) -> dict:
     except OverflowError as e:
         raise HTTPException(503, str(e)) from None
     with s.lock:
-        return {"session_id": s.id, "state": s.state()}
+        return {"session_id": s.id, "state": s.state(), "events": s.take_events()}
 
 
 @app.get("/api/sessions/{sid}")
@@ -109,8 +110,8 @@ def autoplay(sid: str, req: Autoplay) -> dict:
     with s.lock:
         if s.finished:
             raise HTTPException(409, f"The session is over ({MAX_HANDS} hands)")
-        s.autoplay(min(req.hands, MAX_HANDS - s.hands_played), req.user_mode)
-        return {"state": s.state(), "detector": s.detector_json()}
+        s.autoplay(min(req.hands, MAX_HANDS - s.hands_played), req.user_mode, req.animate)
+        return {"state": s.state(), "detector": s.detector_json(), "events": s.take_events()}
 
 
 @app.get("/api/sessions/{sid}/detector")

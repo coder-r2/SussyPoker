@@ -16,7 +16,10 @@ export function Card({ card, big }: { card?: string | null; big?: boolean }) {
   );
 }
 
+const THINKING = "…";
+
 function bubbleKind(text: string): string {
+  if (text === THINKING) return "thinking";
   if (text.startsWith("fold")) return "fold";
   if (text.startsWith("all-in")) return "allin";
   if (text.startsWith("raise")) return "raise";
@@ -26,7 +29,8 @@ function bubbleKind(text: string): string {
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/** A poker table drawn from a snapshot. `bubble` shows the latest action over a seat; `stepKey` restarts animations. */
+/** A poker table drawn from a snapshot. `bubble` shows the latest action over a seat ("…" = still thinking);
+ * `stepKey` restarts animations. */
 export function Table({ view, labels = {}, bubble, stepKey = 0, showNet = false }: {
   view: TableView; labels?: Record<number, { text: string; kind: "you" | "partner" }>; bubble?: { seat: number; text: string } | null;
   stepKey?: number | string; showNet?: boolean }) {
@@ -69,7 +73,8 @@ export function Table({ view, labels = {}, bubble, stepKey = 0, showNet = false 
       })}
       {bubble && (() => {
         const [x, y] = SEAT_POS[bubble.seat];
-        return <span key={`b-${stepKey}`} className={`bubble ${bubbleKind(bubble.text)}`} style={{ left: `${x}%`, top: `${y - 13.5}%` }}>{bubble.text}</span>;
+        return <span key={`b-${stepKey}`} className={`bubble ${bubbleKind(bubble.text)}`} style={{ left: `${x}%`, top: `${y - 13.5}%` }}>
+          {bubble.text === THINKING ? <span className="dots" aria-label="thinking"><i /><i /><i /></span> : bubble.text}</span>;
       })()}
       {showNet && view.seats.filter((s) => (s.net ?? 0) !== 0 && !s.folded || (s.net ?? 0) > 0).map((s) => {
         const [x, y] = SEAT_POS[s.seat];

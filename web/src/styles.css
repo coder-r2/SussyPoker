@@ -277,6 +277,11 @@ input[type="range"] { accent-color: var(--brand); }
 .bubble::after { content: ""; position: absolute; left: 50%; bottom: -6px; margin-left: -6px; border: 6px solid transparent; border-bottom: 0;
   border-top-color: #fff; }
 .bubble.fold { background: #e5e7eb; color: #555; }
+.bubble.thinking { padding: 6px 10px; }
+.bubble .dots { display: inline-flex; gap: 3px; }
+.bubble .dots i { width: 6px; height: 6px; border-radius: 50%; background: #7c3aed; display: inline-block; animation: blink 1s infinite; }
+.bubble .dots i:nth-child(2) { animation-delay: 0.15s; }
+.bubble .dots i:nth-child(3) { animation-delay: 0.3s; }
 .bubble.fold::after { border-top-color: #e5e7eb; }
 .bubble.raise, .bubble.bet, .bubble.allin { background: #f59e0b; color: #1b1530; }
 .bubble.raise::after, .bubble.bet::after, .bubble.allin::after { border-top-color: #f59e0b; }
